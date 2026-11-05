@@ -13,8 +13,15 @@ if (globalObj.ngJest) {
 /* eslint-disable @typescript-eslint/no-empty-function */
 // jsdom has no working cross-tab postMessage. @onecx/accelerator v7 falls back to the real
 // window.postMessage when publishing topics (no BroadcastChannel in jsdom); that real
-// setTimeout outlives zone-based fakeAsync and crashes jsdom at teardown. Stub it as a no-op
-// (the specs use FakeTopic and never assert on postMessage delivery).
+// setTimeout outlives zone-based fakeAsync and crashes jsdom at teardown. It is therefore
+// stubbed as a no-op for every spec (the specs use FakeTopic and never assert on postMessage
+// delivery).
+//
+// Known limitation of this stub: it silently drops real postMessage delivery. A spec that
+// genuinely needs to assert on it must not rely on this no-op — restore a real implementation
+// scoped to that spec and drive delivery at the source (a real Topic/BroadcastChannel) rather
+// than the cross-tab window.postMessage this stub stands in for, since the real one crashes
+// jsdom under fakeAsync.
 globalThis.postMessage = jest.fn()
 
 globalThis.ResizeObserver = class {
