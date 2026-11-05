@@ -7,8 +7,6 @@ export const environment = {
   skipRemoteConfigLoad: true,
   apiPrefix: 'bff',
 
-  KEYCLOAK_URL: 'http://keycloak-app/',
-  KEYCLOAK_REALM: 'OneCX',
   TKIT_PORTAL_ID: 'ADMIN'
 }
 

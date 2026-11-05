@@ -2,7 +2,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
 import { provideHttpClient } from '@angular/common/http'
-import { TranslateTestingModule } from 'ngx-translate-testing'
+import { TranslateTestingModule } from 'src/app/shared/mocks/translate-testing.module'
 import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 
@@ -469,6 +469,88 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default'
       })
       jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
+
+      component.onSearchConfigSave({
+        searchConfigs: [],
+        pageName: 'page_name',
+        fieldValues: {},
+        displayedColumnsIds: [],
+        viewMode: basicViewMode,
+        selectedGroupKey: 'default',
+        isColumnGroupComponentActive: true,
+        layout: 'table',
+        currentConfig: undefined,
+        editMode: false,
+        isInChargeOfEdit: false
+      } as any)
+      tick(500)
+
+      expect(addSpy).toHaveBeenCalledTimes(0)
+      expect(setSpy).toHaveBeenCalledTimes(1)
+      expect(setSpy).toHaveBeenCalledWith(undefined)
+    }))
+
+    it('should not add config and reset if the dialog state is null', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      const addSpy = jest.spyOn(store, 'addSearchConfig')
+      const setSpy = jest.spyOn(store, 'setCurrentConfig')
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'appId',
+          productName: 'product'
+        } as any)
+      )
+
+      store.patchState({
+        searchConfigs: [],
+        pageName: 'page_name',
+        fieldValues: {},
+        displayedColumnsIds: [],
+        viewMode: basicViewMode,
+        selectedGroupKey: 'default'
+      })
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(null as any))
+
+      component.onSearchConfigSave({
+        searchConfigs: [],
+        pageName: 'page_name',
+        fieldValues: {},
+        displayedColumnsIds: [],
+        viewMode: basicViewMode,
+        selectedGroupKey: 'default',
+        isColumnGroupComponentActive: true,
+        layout: 'table',
+        currentConfig: undefined,
+        editMode: false,
+        isInChargeOfEdit: false
+      } as any)
+      tick(500)
+
+      expect(addSpy).toHaveBeenCalledTimes(0)
+      expect(setSpy).toHaveBeenCalledTimes(1)
+      expect(setSpy).toHaveBeenCalledWith(undefined)
+    }))
+
+    it('should not add config and reset if the dialog state has no result', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      const addSpy = jest.spyOn(store, 'addSearchConfig')
+      const setSpy = jest.spyOn(store, 'setCurrentConfig')
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'appId',
+          productName: 'product'
+        } as any)
+      )
+
+      store.patchState({
+        searchConfigs: [],
+        pageName: 'page_name',
+        fieldValues: {},
+        displayedColumnsIds: [],
+        viewMode: basicViewMode,
+        selectedGroupKey: 'default'
+      })
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of({ result: undefined, button: 'primary' } as any))
 
       component.onSearchConfigSave({
         searchConfigs: [],

@@ -2,7 +2,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
 import { provideHttpClient } from '@angular/common/http'
-import { TranslateTestingModule } from 'ngx-translate-testing'
+import { TranslateTestingModule } from 'src/app/shared/mocks/translate-testing.module'
 import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 

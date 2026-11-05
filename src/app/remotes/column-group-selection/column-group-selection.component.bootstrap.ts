@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { importProvidersFrom, inject, provideAppInitializer } from '@angular/core'
 import { TranslateLoader } from '@ngx-translate/core'
@@ -10,12 +10,12 @@ import { UserService } from '@onecx/angular-integration-interface'
 import { provideTranslateServiceForRoot } from '@onecx/angular-remote-components'
 import { bootstrapRemoteComponent } from '@onecx/angular-webcomponents'
 import {
-  createTranslateLoader,
-  provideThemeConfig,
+  OnecxTranslateLoader,
   provideTranslationPathFromMeta,
   REMOTE_COMPONENT_CONFIG,
   RemoteComponentConfig
 } from '@onecx/angular-utils'
+import { provideThemeConfig } from '@onecx/angular-utils/theme/primeng'
 
 import { environment } from 'src/environments/environment'
 import { columngGroupSelectionStoreName } from 'src/app/shared/constants'
@@ -63,8 +63,7 @@ bootstrapRemoteComponent(
       isolate: true,
       loader: {
         provide: TranslateLoader,
-        useFactory: createTranslateLoader,
-        deps: [HttpClient]
+        useClass: OnecxTranslateLoader
       }
     }),
     provideThemeConfig()

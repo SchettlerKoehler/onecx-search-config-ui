@@ -11,6 +11,12 @@ if (globalObj.ngJest) {
 }
 
 /* eslint-disable @typescript-eslint/no-empty-function */
+// jsdom has no working cross-tab postMessage. @onecx/accelerator v7 falls back to the real
+// window.postMessage when publishing topics (no BroadcastChannel in jsdom); that real
+// setTimeout outlives zone-based fakeAsync and crashes jsdom at teardown. Stub it as a no-op
+// (the specs use FakeTopic and never assert on postMessage delivery).
+globalThis.postMessage = jest.fn()
+
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}

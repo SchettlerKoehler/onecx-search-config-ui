@@ -1,4 +1,4 @@
-import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { importProvidersFrom, inject, provideAppInitializer } from '@angular/core'
 import { TranslateLoader } from '@ngx-translate/core'
@@ -9,12 +9,12 @@ import { AngularAuthModule } from '@onecx/angular-auth'
 import { bootstrapRemoteComponent } from '@onecx/angular-webcomponents'
 import { UserService } from '@onecx/angular-integration-interface'
 import {
-  createTranslateLoader,
-  provideThemeConfig,
+  OnecxTranslateLoader,
   provideTranslationPathFromMeta,
   REMOTE_COMPONENT_CONFIG,
   RemoteComponentConfig
 } from '@onecx/angular-utils'
+import { provideThemeConfig } from '@onecx/angular-utils/theme/primeng'
 import { provideTranslateServiceForRoot } from '@onecx/angular-remote-components'
 
 import { environment } from 'src/environments/environment'
@@ -60,8 +60,7 @@ bootstrapRemoteComponent(OneCXSearchConfigComponent, 'ocx-search-config-componen
     isolate: true,
     loader: {
       provide: TranslateLoader,
-      useFactory: createTranslateLoader,
-      deps: [HttpClient]
+      useClass: OnecxTranslateLoader
     }
   })
 ]).catch((err) => console.error(err))

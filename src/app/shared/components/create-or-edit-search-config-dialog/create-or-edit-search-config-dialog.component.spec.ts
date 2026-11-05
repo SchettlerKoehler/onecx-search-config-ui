@@ -3,7 +3,7 @@ import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ReactiveFormsModule } from '@angular/forms'
 import { TranslateService } from '@ngx-translate/core'
-import { TranslateTestingModule } from 'ngx-translate-testing'
+import { TranslateTestingModule } from 'src/app/shared/mocks/translate-testing.module'
 
 import { CheckboxModule } from 'primeng/checkbox'
 import { InputTextModule } from 'primeng/inputtext'
