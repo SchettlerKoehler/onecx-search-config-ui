@@ -1,15 +1,15 @@
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { importProvidersFrom, inject, provideAppInitializer } from '@angular/core'
-import { TranslateLoader } from '@ngx-translate/core'
+import { provideMissingTranslationHandler, provideTranslateLoader, provideTranslateService } from '@ngx-translate/core'
 import { ReplaySubject } from 'rxjs'
 
 import { AngularAcceleratorModule, providePortalDialogService } from '@onecx/angular-accelerator'
 import { AngularAuthModule } from '@onecx/angular-auth'
 import { UserService } from '@onecx/angular-integration-interface'
-import { provideTranslateServiceForRoot } from '@onecx/angular-remote-components'
 import { bootstrapRemoteComponent } from '@onecx/angular-webcomponents'
 import {
+  MultiLanguageMissingTranslationHandler,
   OnecxTranslateLoader,
   provideTranslationPathFromMeta,
   REMOTE_COMPONENT_CONFIG,
@@ -59,13 +59,11 @@ bootstrapRemoteComponent(
       return initializerFn()
     }),
     provideTranslationPathFromMeta(import.meta.url, 'assets/i18n/'),
-    provideTranslateServiceForRoot({
-      isolate: true,
-      loader: {
-        provide: TranslateLoader,
-        useClass: OnecxTranslateLoader
-      }
-    }),
-    provideThemeConfig()
+    provideThemeConfig(),
+    provideTranslateService({
+      defaultLanguage: 'en',
+      loader: provideTranslateLoader(OnecxTranslateLoader),
+      missingTranslationHandler: provideMissingTranslationHandler(MultiLanguageMissingTranslationHandler)
+    })
   ]
 ).catch((err) => console.error(err))

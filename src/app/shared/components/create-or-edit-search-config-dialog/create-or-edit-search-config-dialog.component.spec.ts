@@ -3,12 +3,12 @@ import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ReactiveFormsModule } from '@angular/forms'
 import { TranslateService } from '@ngx-translate/core'
-import { TranslateTestingModule } from 'src/app/shared/mocks/translate-testing.module'
 
 import { CheckboxModule } from 'primeng/checkbox'
 import { InputTextModule } from 'primeng/inputtext'
 
 import { DialogState } from '@onecx/angular-accelerator'
+import { provideTranslateTestingService } from '@onecx/angular-testing'
 
 import { CreateOrEditSearchConfigDialogComponent } from './create-or-edit-search-config-dialog.component'
 
@@ -20,17 +20,15 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [],
-      imports: [
-        CheckboxModule,
-        CreateOrEditSearchConfigDialogComponent,
-        TranslateTestingModule.withTranslations({
+      imports: [CheckboxModule, CreateOrEditSearchConfigDialogComponent, ReactiveFormsModule, InputTextModule],
+      providers: [
+        ...provideTranslateTestingService({
           en: require('./src/assets/i18n/en.json'),
           de: require('./src/assets/i18n/de.json')
-        }).withDefaultLanguage('en'),
-        ReactiveFormsModule,
-        InputTextModule
-      ],
-      providers: [provideHttpClient(withInterceptorsFromDi()), provideHttpClientTesting()]
+        }),
+        provideHttpClient(withInterceptorsFromDi()),
+        provideHttpClientTesting()
+      ]
     }).compileComponents()
 
     fixture = TestBed.createComponent(CreateOrEditSearchConfigDialogComponent)
