@@ -1,23 +1,15 @@
 const webpack = require('webpack')
 const { ModifySourcePlugin, ReplaceOperation } = require('modify-source-webpack-plugin')
 const { ModuleFederationPlugin } = require('@module-federation/enhanced/webpack')
-const { getOneCXSharedRecommendations } = require('@onecx/build-utils')
+const { getOneCXSharedLibraryConfig } = require('@onecx/build-utils')
 
 const packageJson = require('./package.json')
 
-// Shared package list for the module federation container. Uses the OneCX
-// recommended sharing per top-level dependency (onecx shell v3 / Angular 21).
-// `@angular/common/http` is shared explicitly (the app imports it) and, like the
-// v7 config, must be a single instance shared with the shell.
-const shared = {}
-for (const libName of Object.keys(packageJson.dependencies)) {
-  const config = getOneCXSharedRecommendations(libName, {
-    requiredVersion: packageJson.dependencies[libName],
-    shareScope: 'angular_21'
-  })
-  if (config !== false) shared[libName] = config
-}
-shared['@angular/common/http'] = { requiredVersion: 'auto', shareScope: 'angular_21' }
+// Shared package list for the module federation container. Built from the OneCX
+// recommended shared library config (onecx shell v3 / Angular 21); with sub-package
+// generation on, this also emits each dependency's secondary entry points (e.g.
+// primeng/button, @angular/common/http) into the shared scope.
+const shared = getOneCXSharedLibraryConfig(packageJson.dependencies, true)
 
 const modifyPrimeNgPlugin = new ModifySourcePlugin({
   rules: [
