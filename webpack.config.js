@@ -54,6 +54,10 @@ module.exports = {
       name: 'onecx-search-config-ui',
       filename: 'remoteEntry.js',
       library: { type: 'module' },
+      // Nothing in this repo (or the shell) consumes the generated DTS /
+      // @mf-types.zip / mf-stats.json artifacts, so skip the federated-types
+      // (DTS) step on every build.
+      dts: false,
       shareScope: 'angular_21',
       exposes: {
         './OneCXSearchConfigComponent': 'src/app/remotes/search-config/search-config.component.main.ts',

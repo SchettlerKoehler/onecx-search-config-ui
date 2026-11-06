@@ -75,7 +75,7 @@
     "zone.js": "0.15.1"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "21.2.27",
+    "@angular-devkit/build-angular": "^21.0.0",
     "@angular-devkit/core": "^21.0.0",
     "@angular-devkit/schematics": "^21.0.0",
     "@angular-eslint/eslint-plugin": "^19.8.1",
@@ -87,6 +87,7 @@
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.5.0",
     "@module-federation/enhanced": "^2.0.0",
+    "@module-federation/runtime-core": "^2.0.0",
     "@nx/angular": "22.6.4",
     "@nx/eslint": "22.6.4",
     "@nx/eslint-plugin": "22.6.4",
@@ -124,6 +125,6 @@
     "ts-jest": "^29.4.0",
     "ts-node": "10.9.2",
     "typescript": "~5.9.0",
-    "webpack": "5.105.2"
+    "webpack": "^5.105.2"
   }
 }

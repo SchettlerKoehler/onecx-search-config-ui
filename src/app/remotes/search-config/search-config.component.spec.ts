@@ -1,6 +1,8 @@
 import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
+import { createApplication } from '@angular/platform-browser'
+import { NgZone, ɵNoopNgZone as NoopNgZone } from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
 import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
@@ -9,6 +11,15 @@ import { FakeTopic } from '@onecx/accelerator'
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { AppStateService } from '@onecx/angular-integration-interface'
+import { UserService } from '@onecx/angular-integration-interface'
+import {
+  provideAppConfigServiceMock,
+  provideAppStateServiceMock,
+  provideConfigurationServiceMock,
+  providePortalMessageServiceMock,
+  provideRemoteComponentsServiceMock,
+  provideShellCapabilityServiceMock
+} from '@onecx/angular-integration-interface/mocks'
 import { provideTranslateTestingService } from '@onecx/angular-testing'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 
@@ -23,6 +34,7 @@ import { CreateOrEditSearchConfigDialogComponent } from 'src/app/shared/componen
 import { Configuration, SearchConfigAPIService } from 'src/app/shared/generated'
 import { advancedViewMode, basicViewMode } from 'src/app/shared/constants'
 import { OneCXSearchConfigComponent } from './search-config.component'
+import { searchConfigProviders } from './search-config.component.providers'
 
 const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: string]: any } => {
   const obj: any = {}
@@ -1717,4 +1729,41 @@ describe('OneCXSearchConfigComponent', () => {
       expect(() => component.focusManageButton()).not.toThrow()
     })
   })
+})
+
+describe('search-config zone-based change detection', () => {
+  it('boots the remote providers and injects a real NgZone (not NoopNgZone)', async () => {
+    const shellMocks = [
+      provideAppConfigServiceMock(),
+      provideAppStateServiceMock(),
+      provideConfigurationServiceMock(),
+      providePortalMessageServiceMock(),
+      provideRemoteComponentsServiceMock(),
+      provideShellCapabilityServiceMock()
+    ].flat()
+
+    // The accelerator's own APP_INITIALIZER awaits `firstValueFrom(userService.lang$.pipe(skip(1)))`,
+    // so the UserService stub must emit `lang$` at least twice for the app initializer
+    // to resolve under the test environment (the locale-data load itself is wrapped in a
+    // try/catch inside the accelerator, so its jsdom limitation is non-fatal).
+    const userServiceStub = {
+      isInitialized: Promise.resolve(),
+      lang$: of('en', 'en')
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const app = await createApplication({
+      providers: [
+        ...searchConfigProviders(undefined),
+        ...shellMocks,
+        { provide: UserService, useValue: userServiceStub }
+      ]
+    } as any)
+    const zone = app.injector.get(NgZone)
+
+    expect(zone).toBeInstanceOf(NgZone)
+    expect(zone).not.toBeInstanceOf(NoopNgZone)
+
+    app.destroy()
+  }, 20000)
 })
