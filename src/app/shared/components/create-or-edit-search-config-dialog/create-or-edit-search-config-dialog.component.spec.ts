@@ -35,7 +35,7 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
     component = fixture.componentInstance
 
     translateService = TestBed.inject(TranslateService)
-    translateService.setDefaultLang('en')
+    translateService.setFallbackLang('en')
     translateService.use('en')
 
     fixture.detectChanges()

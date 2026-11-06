@@ -288,11 +288,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
           this.searchConfigStore.pageName$
         ),
         mergeMap(([dialogResult, currentMfe, pageData, pageName]) => {
-          if (!dialogResult) {
-            return of(undefined)
-          }
-
-          const result = dialogResult.result
+          const result = dialogResult?.result
 
           if (!result) {
             return of(undefined)
