@@ -5,8 +5,8 @@ import { provideHttpClient } from '@angular/common/http'
 import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 
+import { FakeTopic } from '@onecx/accelerator'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
-import { FakeTopic } from '@onecx/angular-integration-interface/mocks'
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { provideTranslateTestingService } from '@onecx/angular-testing'
@@ -92,8 +92,8 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       imports: [OneCXColumnGroupSelectionComponent, NoopAnimationsModule],
       providers: [
         ...provideTranslateTestingService({
-          en: require('./src/assets/i18n/en.json'),
-          de: require('./src/assets/i18n/de.json')
+          en: require('../../../assets/i18n/en.json'),
+          de: require('../../../assets/i18n/de.json')
         }),
         DialogService,
         provideHttpClient(),

@@ -1,53 +1,23 @@
 const webpack = require('webpack')
-const { ModifyEntryPlugin } = require('@angular-architects/module-federation/src/utils/modify-entry-plugin')
 const { ModifySourcePlugin, ReplaceOperation } = require('modify-source-webpack-plugin')
-const { share, withModuleFederationPlugin } = require('@angular-architects/module-federation/webpack')
+const { ModuleFederationPlugin } = require('@module-federation/enhanced/webpack')
+const { getOneCXSharedRecommendations } = require('@onecx/build-utils')
 
-const config = withModuleFederationPlugin({
-  name: 'onecx-search-config-ui',
-  filename: 'remoteEntry.js',
-  exposes: {
-    './OneCXSearchConfigComponent': 'src/app/remotes/search-config/search-config.component.main.ts',
-    './OneCXColumnGroupSelectionComponent':
-      'src/app/remotes/column-group-selection/column-group-selection.component.main.ts'
-  },
-  shared: share({
-    '@angular/core': { requiredVersion: 'auto', includeSecondaries: true },
-    '@angular/forms': { requiredVersion: 'auto', includeSecondaries: true },
-    '@angular/common': {
-      requiredVersion: 'auto',
-      includeSecondaries: { skip: ['@angular/common/http/testing'] }
-    },
-    '@angular/common/http': {
-      requiredVersion: 'auto',
-      includeSecondaries: true
-    },
-    '@angular/router': { requiredVersion: 'auto', includeSecondaries: true },
-    rxjs: { requiredVersion: 'auto', includeSecondaries: true },
-    primeng: { requiredVersion: 'auto', includeSecondaries: true },
-    '@ngx-translate/core': { requiredVersion: 'auto' },
-    '@onecx/accelerator': { requiredVersion: 'auto', includeSecondaries: true },
-    '@onecx/angular-accelerator': {
-      requiredVersion: 'auto',
-      includeSecondaries: true
-    },
-    '@onecx/angular-auth': {
-      requiredVersion: 'auto',
-      includeSecondaries: true
-    },
-    '@onecx/angular-remote-components': {
-      requiredVersion: 'auto',
-      includeSecondaries: true
-    },
-    '@onecx/angular-webcomponents': {
-      requiredVersion: 'auto',
-      includeSecondaries: true
-    }
+const packageJson = require('./package.json')
+
+// Shared package list for the module federation container. Uses the OneCX
+// recommended sharing per top-level dependency (onecx shell v3 / Angular 21).
+// `@angular/common/http` is shared explicitly (the app imports it) and, like the
+// v7 config, must be a single instance shared with the shell.
+const shared = {}
+for (const libName of Object.keys(packageJson.dependencies)) {
+  const config = getOneCXSharedRecommendations(libName, {
+    requiredVersion: packageJson.dependencies[libName],
+    shareScope: 'angular_21'
   })
-})
-config.devServer = { allowedHosts: 'all' }
-
-const plugins = config.plugins.filter((plugin) => !(plugin instanceof ModifyEntryPlugin))
+  if (config !== false) shared[libName] = config
+}
+shared['@angular/common/http'] = { requiredVersion: 'auto', shareScope: 'angular_21' }
 
 const modifyPrimeNgPlugin = new ModifySourcePlugin({
   rules: [
@@ -87,17 +57,28 @@ const modifyMaterialPlugin = new ModifySourcePlugin({
 })
 
 module.exports = {
-  ...config,
   plugins: [
-    ...plugins,
+    new ModuleFederationPlugin({
+      name: 'onecx-search-config-ui',
+      filename: 'remoteEntry.js',
+      library: { type: 'module' },
+      shareScope: 'angular_21',
+      exposes: {
+        './OneCXSearchConfigComponent': 'src/app/remotes/search-config/search-config.component.main.ts',
+        './OneCXColumnGroupSelectionComponent':
+          'src/app/remotes/column-group-selection/column-group-selection.component.main.ts'
+      },
+      shared
+    }),
     modifyPrimeNgPlugin,
     modifyMaterialPlugin,
     new webpack.DefinePlugin({
       ngDevMode: true
     })
   ],
+  devServer: { allowedHosts: 'all' },
   output: { uniqueName: 'onecx-search-config-ui', publicPath: 'auto' },
-  experiments: { ...config.experiments, topLevelAwait: true },
-  module: { ...config.module, parser: { javascript: { importMeta: false } } },
+  experiments: { topLevelAwait: true, outputModule: true },
+  module: { parser: { javascript: { importMeta: false } } },
   optimization: { runtimeChunk: false, splitChunks: false }
 }

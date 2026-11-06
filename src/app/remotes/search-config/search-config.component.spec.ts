@@ -5,10 +5,10 @@ import { provideHttpClient } from '@angular/common/http'
 import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 
+import { FakeTopic } from '@onecx/accelerator'
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { AppStateService } from '@onecx/angular-integration-interface'
-import { FakeTopic } from '@onecx/angular-integration-interface/mocks'
 import { provideTranslateTestingService } from '@onecx/angular-testing'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 
@@ -95,8 +95,8 @@ describe('OneCXSearchConfigComponent', () => {
       imports: [OneCXSearchConfigComponent, NoopAnimationsModule],
       providers: [
         ...provideTranslateTestingService({
-          en: require('./src/assets/i18n/en.json'),
-          de: require('./src/assets/i18n/de.json')
+          en: require('../../../assets/i18n/en.json'),
+          de: require('../../../assets/i18n/de.json')
         }),
         provideHttpClient(),
         provideHttpClientTesting(),
