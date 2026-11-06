@@ -57,7 +57,6 @@ bootstrapRemoteComponent(OneCXSearchConfigComponent, 'ocx-search-config-componen
   provideTranslationPathFromMeta(import.meta.url, 'assets/i18n/'),
   provideThemeConfig(),
   provideTranslateService({
-    defaultLanguage: 'en',
     loader: provideTranslateLoader(OnecxTranslateLoader),
     missingTranslationHandler: provideMissingTranslationHandler(MultiLanguageMissingTranslationHandler)
   })
