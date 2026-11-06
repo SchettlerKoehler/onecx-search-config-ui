@@ -2,7 +2,6 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
 import { provideHttpClient } from '@angular/common/http'
-import { TranslateTestingModule } from 'ngx-translate-testing'
 import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 
@@ -10,6 +9,7 @@ import { PortalDialogService } from '@onecx/angular-accelerator'
 import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { AppStateService } from '@onecx/angular-integration-interface'
 import { FakeTopic } from '@onecx/angular-integration-interface/mocks'
+import { provideTranslateTestingService } from '@onecx/angular-testing'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 
 import {
@@ -92,15 +92,12 @@ describe('OneCXSearchConfigComponent', () => {
     baseUrlSubject = new ReplaySubject<any>(1)
     TestBed.configureTestingModule({
       declarations: [],
-      imports: [
-        OneCXSearchConfigComponent,
-        NoopAnimationsModule,
-        TranslateTestingModule.withTranslations({
+      imports: [OneCXSearchConfigComponent, NoopAnimationsModule],
+      providers: [
+        ...provideTranslateTestingService({
           en: require('./src/assets/i18n/en.json'),
           de: require('./src/assets/i18n/de.json')
-        }).withDefaultLanguage('en')
-      ],
-      providers: [
+        }),
         provideHttpClient(),
         provideHttpClientTesting(),
         {
@@ -489,6 +486,50 @@ describe('OneCXSearchConfigComponent', () => {
       expect(setSpy).toHaveBeenCalledTimes(1)
       expect(setSpy).toHaveBeenCalledWith(undefined)
     }))
+
+    it.each([null, { result: undefined, button: 'primary' }])(
+      'should not add config and reset if the dialog state is %o',
+      fakeAsync((dialogResult: null | { result: undefined; button: 'primary' }) => {
+        const appState = TestBed.inject(AppStateService)
+        const addSpy = jest.spyOn(store, 'addSearchConfig')
+        const setSpy = jest.spyOn(store, 'setCurrentConfig')
+        jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+          of({
+            appId: 'appId',
+            productName: 'product'
+          } as any)
+        )
+
+        store.patchState({
+          searchConfigs: [],
+          pageName: 'page_name',
+          fieldValues: {},
+          displayedColumnsIds: [],
+          viewMode: basicViewMode,
+          selectedGroupKey: 'default'
+        })
+        jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(dialogResult as any))
+
+        component.onSearchConfigSave({
+          searchConfigs: [],
+          pageName: 'page_name',
+          fieldValues: {},
+          displayedColumnsIds: [],
+          viewMode: basicViewMode,
+          selectedGroupKey: 'default',
+          isColumnGroupComponentActive: true,
+          layout: 'table',
+          currentConfig: undefined,
+          editMode: false,
+          isInChargeOfEdit: false
+        } as any)
+        tick(500)
+
+        expect(addSpy).toHaveBeenCalledTimes(0)
+        expect(setSpy).toHaveBeenCalledTimes(1)
+        expect(setSpy).toHaveBeenCalledWith(undefined)
+      })
+    )
 
     it('should not add config and reset if create was not confirmed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)

@@ -42,8 +42,7 @@ const config = withModuleFederationPlugin({
     '@onecx/angular-webcomponents': {
       requiredVersion: 'auto',
       includeSecondaries: true
-    },
-    '@onecx/nx-plugin': { requiredVersion: 'auto', includeSecondaries: true }
+    }
   })
 })
 config.devServer = { allowedHosts: 'all' }

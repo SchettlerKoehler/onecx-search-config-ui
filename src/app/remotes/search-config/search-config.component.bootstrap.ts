@@ -1,7 +1,7 @@
-import { HttpClient, provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http'
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { importProvidersFrom, inject, provideAppInitializer } from '@angular/core'
-import { TranslateLoader } from '@ngx-translate/core'
+import { provideMissingTranslationHandler, provideTranslateLoader, provideTranslateService } from '@ngx-translate/core'
 import { ReplaySubject } from 'rxjs'
 
 import { AngularAcceleratorModule, providePortalDialogService } from '@onecx/angular-accelerator'
@@ -9,13 +9,13 @@ import { AngularAuthModule } from '@onecx/angular-auth'
 import { bootstrapRemoteComponent } from '@onecx/angular-webcomponents'
 import { UserService } from '@onecx/angular-integration-interface'
 import {
-  createTranslateLoader,
-  provideThemeConfig,
+  MultiLanguageMissingTranslationHandler,
+  OnecxTranslateLoader,
   provideTranslationPathFromMeta,
   REMOTE_COMPONENT_CONFIG,
   RemoteComponentConfig
 } from '@onecx/angular-utils'
-import { provideTranslateServiceForRoot } from '@onecx/angular-remote-components'
+import { provideThemeConfig } from '@onecx/angular-utils/theme/primeng'
 
 import { environment } from 'src/environments/environment'
 import { searchConfigStoreName } from 'src/app/shared/constants'
@@ -56,12 +56,8 @@ bootstrapRemoteComponent(OneCXSearchConfigComponent, 'ocx-search-config-componen
   providePortalDialogService(),
   provideTranslationPathFromMeta(import.meta.url, 'assets/i18n/'),
   provideThemeConfig(),
-  provideTranslateServiceForRoot({
-    isolate: true,
-    loader: {
-      provide: TranslateLoader,
-      useFactory: createTranslateLoader,
-      deps: [HttpClient]
-    }
+  provideTranslateService({
+    loader: provideTranslateLoader(OnecxTranslateLoader),
+    missingTranslationHandler: provideMissingTranslationHandler(MultiLanguageMissingTranslationHandler)
   })
 ]).catch((err) => console.error(err))

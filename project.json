@@ -52,6 +52,7 @@
             }
           ],
           "outputHashing": "all",
+          "extractLicenses": false,
           "fileReplacements": [
             {
               "replace": "src/environments/environment.ts",
@@ -77,10 +78,10 @@
       "executor": "@nx/angular:dev-server",
       "configurations": {
         "production": {
-          "browserTarget": "onecx-search-config:build:production"
+          "buildTarget": "onecx-search-config:build:production"
         },
         "development": {
-          "browserTarget": "onecx-search-config:build:development"
+          "buildTarget": "onecx-search-config:build:development"
         }
       },
       "defaultConfiguration": "development",
@@ -93,7 +94,7 @@
     "extract-i18n": {
       "executor": "@angular-devkit/build-angular:extract-i18n",
       "options": {
-        "browserTarget": "onecx-search-config:build"
+        "buildTarget": "onecx-search-config:build"
       }
     },
     "lint": {
