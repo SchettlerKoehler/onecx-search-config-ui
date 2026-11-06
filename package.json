@@ -87,7 +87,6 @@
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.5.0",
     "@module-federation/enhanced": "^2.0.0",
-    "@module-federation/runtime-core": "^2.0.0",
     "@nx/angular": "22.6.4",
     "@nx/eslint": "22.6.4",
     "@nx/eslint-plugin": "22.6.4",
