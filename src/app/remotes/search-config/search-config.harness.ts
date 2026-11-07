@@ -1,74 +1,36 @@
-import { ComponentHarness, ContentContainerComponentHarness } from '@angular/cdk/testing'
+import { ContentContainerComponentHarness } from '@angular/cdk/testing'
 
-import { PButtonHarness } from '@onecx/angular-testing'
+import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-testing'
 
-export class OneCXSearchConfigListItemHarness extends ComponentHarness {
-  public static readonly hostSelector = 'li'
+/** Fixed id of the Save As button joined to the config select (stable style/test anchor). */
+export const SEARCH_CONFIG_SAVE_AS_BUTTON_ID = 'sc_search_config_save_as'
 
-  getSpan = this.locatorFor('span')
-  getEditButton = this.locatorForOptional('p-button.search_config_edit_button')
-  getDeleteButton = this.locatorForOptional('p-button.search_config_delete_button')
-  getSelectButton = this.locatorForOptional('p-button.search_config_select_button')
-
-  async getText() {
-    return (await this.getSpan()).text()
-  }
-}
-
+/**
+ * Config select of the search header remote. The `p-select` panel and tooltips render inside the
+ * remote's element (in-remote `appendTo`), so the panel is reachable from the document root while
+ * staying scoped to this remote.
+ */
 export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
   static readonly hostSelector = 'app-ocx-search-config'
 
-  private readonly _saveEditPButton = this.locatorForOptional(
-    PButtonHarness.with({ id: 'sc_search_config_save_search_config_edit' })
-  )
-  private readonly _cancelEditPButton = this.locatorForOptional(
-    PButtonHarness.with({ id: 'sc_search_config_cancel_search_config_edit' })
-  )
+  private readonly _select = this.locatorForOptional(PSelectHarness)
+  private readonly _saveAsButton = this.locatorForOptional(PButtonHarness.with({ id: SEARCH_CONFIG_SAVE_AS_BUTTON_ID }))
 
-  private readonly _managePButton = this.locatorForOptional(
-    PButtonHarness.with({ id: 'sc_search_config_manage_search_config' })
-  )
-
-  async getSaveEditButton() {
-    return await this._saveEditPButton()
+  async getConfigSelect() {
+    return await this._select()
   }
 
-  async getCancelEditButton() {
-    return await this._cancelEditPButton()
+  async getSaveAsButton() {
+    return await this._saveAsButton()
   }
 
-  async getManageButton() {
-    return await this._managePButton()
-  }
-
-  async getHarnessLoaderForOverlay() {
-    return this.documentRootLocatorFactory().harnessLoaderForOptional('.p-popover')
-  }
-
-  async isOpen(): Promise<boolean> {
-    return !!(await this.getHarnessLoaderForOverlay())
-  }
-
-  async open() {
-    if (!(await this.isOpen())) {
-      await (await this.getManageButton())?.click()
-    }
-  }
-
-  async getAddItem() {
-    await this.open()
-    const overlay = await this.getHarnessLoaderForOverlay()
-    if (!overlay) return null
-    try {
-      return await overlay.getHarness(PButtonHarness)
-    } catch (err) {
-      return null
-    }
-  }
-
-  async getItems() {
-    await this.open()
-    const overlay = await this.getHarnessLoaderForOverlay()
-    return await overlay?.getAllHarnesses(OneCXSearchConfigListItemHarness)
+  /**
+   * Rows of the opened config select. The panel is appended to the remote element, i.e. outside the
+   * `<p-select>` host, so it must be resolved from the document root (see `PSelectHarness#getSelectItems`);
+   * pick a single row by its rendered text from the returned list.
+   */
+  async getSelectItems(): Promise<ListItemHarness[]> {
+    const select = await this.getConfigSelect()
+    return (await select?.getSelectItems()) ?? []
   }
 }

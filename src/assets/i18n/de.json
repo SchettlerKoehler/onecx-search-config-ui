@@ -21,9 +21,16 @@
       "TOOLTIP": "Bearbeitung der Suchkonfiguration abbrechen"
     },
     "SELECT": {
-      "LABEL": "Auswählen",
+      "LABEL": "Suchkonfiguration",
       "ARIA_LABEL": "Suchkonfiguration auswählen",
-      "TOOLTIP": "Suchkonfiguration auswählen"
+      "TOOLTIP": "Suchkonfiguration auswählen",
+      "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
+      "FILTER_PLACEHOLDER": "Nach Name filtern",
+      "NO_MATCH": "Keine passenden Suchkonfigurationen"
+    },
+    "SAVE_AS": {
+      "LABEL": "Speichern unter",
+      "ARIA_LABEL": "Als neue Suchkonfiguration speichern"
     },
     "MANAGE": {
       "LABEL": "Suchkonfigurationen verwalten",
@@ -62,9 +69,13 @@
       "HEADER": "Suchkonfiguration löschen",
       "MESSAGE": "Sind Sie sicher, dass Sie die Suchkonfiguration {{config}} löschen möchten?",
       "CONFIRM": "Bestätigen",
-      "CANCEL": "Abbrechen"
+      "CANCEL": "Abbrechen",
+      "HEADER_QUESTION": "Suchkonfiguration löschen?",
+      "DELETE_MESSAGE": "Möchten Sie '{{config}}' wirklich löschen? Das kann nicht rückgängig gemacht werden.",
+      "DELETE": "Löschen"
     },
     "DELETE_SUCCESS": "Suchkonfiguration erfolgreich gelöscht",
+    "DELETE_CONFIG_SUCCESS": "Suchkonfiguration '{{config}}' gelöscht.",
     "DELETE_FAILURE": "Fehler beim Löschen der Suchkonfiguration",
     "FETCH_FAILURE": "Fehler beim Laden der Suchkonfiguration"
   },

@@ -10,3 +10,97 @@
 .p-popover:after {
   right: 1rem !important;
 }
+
+/*
+ * Search-config design tokens.
+ *
+ * Every value is a PrimeNG design token or another --onecx-search-config-* variable. No
+ * hard-coded colors or sizes are used (the two fixed rem dimensions below are the app-owned
+ * layout decisions for which PrimeNG provides no token). Later tickets must keep this rule:
+ * PrimeNG tokens or --onecx-search-config-* only, defined here in styles.scss.
+ */
+:root {
+  /* Whole input group (select + joined Save As). App-owned: PrimeNG has no width token for it. */
+  --onecx-search-config-width: 18rem;
+  /* Control height. App-owned: PrimeNG sizes the select control from padding, not a height token. */
+  --onecx-search-config-height: 2.5rem;
+  /* Corner radius of the control, matched to the PrimeNG select token. */
+  --onecx-search-config-radius: var(--p-select-border-radius);
+  /* Control border color. */
+  --onecx-search-config-border-color: var(--p-select-border-color);
+  /* Maximum height of the opened option list (overlay) before it scrolls. */
+  --onecx-search-config-panel-max-height: 20rem;
+  /* Delete (trash) icon color — the PrimeNG danger (red) button color. */
+  --onecx-search-config-delete-color: var(--p-button-danger-background);
+  /* Light-red hover background behind the trash icon (PrimeNG text-danger hover tint). */
+  --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
+  /* Color of the "modified" marker on a config row (used by a later ticket). */
+  --onecx-search-config-modified-marker-color: var(--p-button-warn-color);
+  /* Color of a config option-group header in the list (used by a later ticket). */
+  --onecx-search-config-group-header-color: var(--p-select-option-group-color);
+  /* Width of the reusable delete-confirm dialog (applied by the host via data-style-id). */
+  --onecx-search-config-dialog-width: 30rem;
+}
+
+/*
+ * Search header remote: the config select joined to the Save As button.
+ *
+ * Selectors are rooted at the remote's host element (ocx-search-config-component, registered as
+ * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel and
+ * tooltips render inside the remote's element (in-remote appendTo), so they are descendants of the
+ * host element and are reached through the stable panelStyleClass / styleClass hooks. The
+ * delete-confirm dialog is portaled outside the remote element and is sized and reached by the
+ * host through data-style-id scoping (see the README).
+ */
+ocx-search-config-component {
+  .sc-search-config-group {
+    width: var(--onecx-search-config-width);
+  }
+
+  .sc-search-config-select {
+    height: var(--onecx-search-config-height);
+    border-radius: var(--onecx-search-config-radius);
+    border-color: var(--onecx-search-config-border-color);
+  }
+
+  /* Config-select option list: single-line rows (ellipsis + tooltip); height capped. */
+  .sc-search-config-panel {
+    .p-select-list {
+      max-height: var(--onecx-search-config-panel-max-height);
+    }
+
+    .sc-search-config-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .sc-search-config-row-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Trash affordance: always visible, red, borderless; light-red background on hover. */
+    .sc-search-config-delete {
+      flex: 0 0 auto;
+      margin: 0;
+      color: var(--onecx-search-config-delete-color);
+      background: transparent;
+      border: 0;
+
+      &:hover,
+      &:focus {
+        background: var(--onecx-search-config-delete-hover-background);
+      }
+    }
+  }
+
+  /* The joined Save As button shares the control height. */
+  .sc-search-config-save-as {
+    height: var(--onecx-search-config-height);
+  }
+}

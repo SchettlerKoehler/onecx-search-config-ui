@@ -22,9 +22,16 @@
       "TOOLTIP": "Stop editing search config"
     },
     "SELECT": {
-      "LABEL": "Select",
+      "LABEL": "Search Config",
       "ARIA_LABEL": "Select search config",
-      "TOOLTIP": "Select search config"
+      "TOOLTIP": "Select search config",
+      "NO_CONFIGS_LABEL": "No search configs",
+      "FILTER_PLACEHOLDER": "Filter by name",
+      "NO_MATCH": "No matching configs"
+    },
+    "SAVE_AS": {
+      "LABEL": "Save As",
+      "ARIA_LABEL": "Save as new search config"
     },
     "MANAGE": {
       "LABEL": "Manage search configs",
@@ -63,9 +70,13 @@
       "HEADER": "Delete search config",
       "MESSAGE": "Are you sure you want to delete search config {{config}}",
       "CONFIRM": "Confirm",
-      "CANCEL": "Cancel"
+      "CANCEL": "Cancel",
+      "HEADER_QUESTION": "Delete search config?",
+      "DELETE_MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
+      "DELETE": "Delete"
     },
     "DELETE_SUCCESS": "Successfully deleted search config",
+    "DELETE_CONFIG_SUCCESS": "Search config '{{config}}' deleted.",
     "DELETE_FAILURE": "Failed to delete search config",
     "FETCH_FAILURE": "Failed to load search config"
   },
