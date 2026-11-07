@@ -34,9 +34,14 @@ import {
 } from 'src/app/shared/search-config.store'
 import { CreateOrEditSearchConfigDialogComponent } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
 import { Configuration, SearchConfigAPIService } from 'src/app/shared/generated'
-import { advancedViewMode, basicViewMode } from 'src/app/shared/constants'
-import { OneCXSearchConfigComponent, SEARCH_CONFIG_DELETE_BUTTON_ID } from './search-config.component'
-import { OneCXSearchConfigHarness, SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from './search-config.harness'
+import {
+  advancedViewMode,
+  basicViewMode,
+  SEARCH_CONFIG_DELETE_BUTTON_ID,
+  SEARCH_CONFIG_SAVE_AS_BUTTON_ID
+} from 'src/app/shared/constants'
+import { OneCXSearchConfigComponent } from './search-config.component'
+import { OneCXSearchConfigHarness } from './search-config.harness'
 import { searchConfigProviders } from './search-config.component.providers'
 
 const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: string]: any } => {

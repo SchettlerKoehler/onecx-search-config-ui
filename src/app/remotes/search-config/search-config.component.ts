@@ -49,12 +49,15 @@ import {
   CreateOrEditSearchConfigDialogComponent,
   CreateOrEditSearchDialogContent
 } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
-import { advancedViewMode, advancedViewModeType, basicViewMode, basicViewModeType } from 'src/app/shared/constants'
+import {
+  advancedViewMode,
+  advancedViewModeType,
+  basicViewMode,
+  basicViewModeType,
+  SEARCH_CONFIG_DELETE_BUTTON_ID
+} from 'src/app/shared/constants'
 import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
 import { environment } from 'src/environments/environment'
-
-/** Fixed id of the Delete button in the delete confirm dialog (reused by the column remote). */
-export const SEARCH_CONFIG_DELETE_BUTTON_ID = 'ocx-search-config-delete-button'
 
 @Component({
   selector: 'app-ocx-search-config',

@@ -2,8 +2,7 @@ import { ContentContainerComponentHarness } from '@angular/cdk/testing'
 
 import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-testing'
 
-/** Fixed id of the Save As button joined to the config select (stable style/test anchor). */
-export const SEARCH_CONFIG_SAVE_AS_BUTTON_ID = 'sc_search_config_save_as'
+import { SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 
 /**
  * Config select of the search header remote. The `p-select` panel and tooltips render inside the

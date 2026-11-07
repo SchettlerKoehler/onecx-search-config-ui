@@ -5,3 +5,12 @@ export const basicViewMode = 'basic'
 
 export const searchConfigStoreName = 'ocx-search-config-component-store'
 export const columngGroupSelectionStoreName = 'ocx-column-group-selection-component-store'
+
+/** Fixed id of the Save As button joined to the config select (stable style/test anchor). */
+export const SEARCH_CONFIG_SAVE_AS_BUTTON_ID = 'sc_search_config_save_as'
+
+/**
+ * Fixed id of the Delete button in the delete confirm dialog. Cross-remote contract: the column
+ * remote reuses the same dialog and Delete button unchanged.
+ */
+export const SEARCH_CONFIG_DELETE_BUTTON_ID = 'ocx-search-config-delete-button'
