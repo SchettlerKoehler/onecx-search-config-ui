@@ -54,7 +54,6 @@ import {
   advancedViewModeType,
   basicViewMode,
   basicViewModeType,
-  SEARCH_CONFIG_DELETE_BUTTON_ID,
   SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
 import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
@@ -110,7 +109,6 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
 
   saveAsIcon = PrimeIcons.SAVE
   deleteIcon = PrimeIcons.TRASH
-  deleteButtonId = SEARCH_CONFIG_DELETE_BUTTON_ID
   saveAsButtonId = SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 
   permissions: string[] = []
@@ -215,9 +213,8 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
 
   onSearchConfigSave(vm: SearchConfigViewModel) {
-    // The selection is not cleared up front: a successful create selects the new config (see the
-    // dialog subscription below), while a cancelled or failed create leaves the current selection
-    // intact in the select.
+    // The selection is not cleared up front so a cancelled or failed create leaves the current
+    // selection intact in the select.
 
     let frozeColumnSaveOptionExplanation = ''
 
@@ -285,17 +282,13 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
 
   onSearchConfigDelete(searchConfig: SearchConfigInfo) {
-    // The whole dialog (title, body, Delete/Cancel buttons with the fixed id and danger severity), the
-    // delete call and the success/error toasts live in the shared `confirmAndDeleteSearchConfig` helper
-    // so the column remote (#960) can open the same dialog unchanged. The dialog carries the remote's
-    // `data-style-id` automatically via the PortalDialogService scope identifier. On success the helper
-    // already fired the success toast; here we just remove the deleted config from the store.
+    // The dialog, delete call and toasts live in the shared `confirmAndDeleteSearchConfig` helper; on
+    // success we just remove the deleted config from the store.
     confirmAndDeleteSearchConfig(
       this.portalDialogService,
       this.searchConfigService,
       this.portalMessageService,
-      searchConfig,
-      this.deleteButtonId
+      searchConfig
     ).subscribe((deleted) => {
       if (deleted) {
         setTimeout(() => {
@@ -307,12 +300,18 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
 
   // Keyboard delete path (WCAG 2.1.1): PrimeNG keeps focus on the select combobox and moves between
   // options with `aria-activedescendant`, so Tab never reaches the trash button nested inside a row.
-  // When the panel is open and the user presses Delete on a deletable option, delete it. PrimeNG's own
-  // Delete handler is a no-op here (`showClear` is not set) and does not stop the event, so this fires
-  // after it. See the `tabindex="-1"`/`aria-hidden` trash button in the template.
+  // The handler is bound on the `p-select` host, so it also receives keydown bubbled up from the
+  // filter input (PrimeNG autofocuses it when the panel opens); only act on the Delete pressed on the
+  // combobox itself so editing the filter text never triggers a delete. PrimeNG's own Delete handler
+  // is a no-op here (`showClear` is not set) and does not stop the event, so this fires after it.
   onSearchConfigSelectKeydown(event: KeyboardEvent): void {
     const select = this.select()
     if (event.code !== 'Delete' || !select || !select.overlayVisible) {
+      return
+    }
+    // Ignore the bubbled Delete of elements inside the overlay (notably the filter input) — the shortcut
+    // only applies to the combobox itself.
+    if (event.target !== select.focusInputViewChild?.nativeElement) {
       return
     }
     const focusedIndex = select.focusedOptionIndex()
@@ -321,6 +320,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
     }
     const option = select.visibleOptions()[focusedIndex] as SearchConfigInfo | undefined
     if (option && this.canDelete(option)) {
+      event.preventDefault()
       this.onSearchConfigDelete(option)
     }
   }

@@ -4,8 +4,8 @@ import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { lastValueFrom, of, throwError } from 'rxjs'
 
 import { SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
-import { SEARCH_CONFIG_DELETE_BUTTON_ID } from './constants'
-import { SEARCH_CONFIG_DIALOG_WIDTH, confirmAndDeleteSearchConfig } from './search-config-delete'
+import { SEARCH_CONFIG_DELETE_BUTTON_ID, SEARCH_CONFIG_DIALOG_WIDTH } from './constants'
+import { confirmAndDeleteSearchConfig } from './search-config-delete'
 
 describe('confirmAndDeleteSearchConfig', () => {
   const config: SearchConfigInfo = {
@@ -41,14 +41,7 @@ describe('confirmAndDeleteSearchConfig', () => {
     messageService = { info, success, error } as unknown as PortalMessageService
   })
 
-  const confirm = () =>
-    confirmAndDeleteSearchConfig(
-      portalDialogService,
-      searchConfigService,
-      messageService,
-      config,
-      SEARCH_CONFIG_DELETE_BUTTON_ID
-    )
+  const confirm = () => confirmAndDeleteSearchConfig(portalDialogService, searchConfigService, messageService, config)
 
   it('should open the delete dialog with the fixed title, body, Delete id, danger severity, cancel and dialog width', async () => {
     openDialog.mockReturnValue(of(undefined))
@@ -68,7 +61,7 @@ describe('confirmAndDeleteSearchConfig', () => {
         id: SEARCH_CONFIG_DELETE_BUTTON_ID,
         severity: 'danger'
       },
-      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
+      'SEARCH_CONFIG.DELETE_CONFIRM.CANCEL',
       { width: SEARCH_CONFIG_DIALOG_WIDTH }
     )
   })

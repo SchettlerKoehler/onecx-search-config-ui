@@ -1,4 +1,4 @@
-import { ContentContainerComponentHarness } from '@angular/cdk/testing'
+import { ContentContainerComponentHarness, TestElement } from '@angular/cdk/testing'
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
 
 import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-testing'
@@ -15,6 +15,8 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
 
   private readonly _select = this.locatorForOptional(PSelectHarness)
   private readonly _saveAsButton = this.locatorForOptional(PButtonHarness.with({ id: SEARCH_CONFIG_SAVE_AS_BUTTON_ID }))
+  // The trash button is the only `p-button` inside the panel, so it resolves from the document root.
+  private readonly _deleteButtons = this.locatorForAll(PButtonHarness.with({ selector: '.sc-search-config-delete' }))
 
   async getConfigSelect() {
     return await this._select()
@@ -35,39 +37,47 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
   }
 
   /**
-   * The rendered rows (`.sc-search-config-row`) of the opened config panel, resolved against the remote
-   * element's native DOM. The panel is `self`-appended (a descendant of the remote), so it stays within
-   * the remote element rather than the document body.
+   * The rendered row (`.sc-search-config-row`) for a given config name, as a `TestElement`. The panel
+   * is opened first so the rows are in the DOM, then the row whose name span text matches exactly is
+   * returned. Each row carries exactly one name span (`.sc-search-config-row-name`) in the same
+   * document order as the rows, so the two lists are compared by index — robust to the other text a
+   * deletable row renders (the keyboard shortcut hint and the trash button).
+   * @throws when no rendered row carries the given name.
    */
-  private async _openPanelAndRows(): Promise<HTMLElement> {
-    await (await this.getConfigSelect())?.open()
-    const host = TestbedHarnessEnvironment.getNativeElement(await this.host())
-    return host as HTMLElement
-  }
-
-  /**
-   * The config row (`.sc-search-config-row`) rendered for a given config name. Opens the panel first so
-   * the rows are in the DOM, then resolves the row whose name text matches exactly.
-   */
-  async getRowByName(name: string): Promise<HTMLElement> {
-    const host = await this._openPanelAndRows()
-    const row = Array.from(host.querySelectorAll('.sc-search-config-row')).find((r) => {
-      const nameSpan = r.querySelector('.sc-search-config-row-name')
-      return nameSpan?.textContent?.trim() === name
-    })
-    if (!row) {
-      throw new Error(`No search-config row found for name "${name}"`)
+  async getRowByName(name: string): Promise<TestElement> {
+    await this.openPanel()
+    const rows = await this.locatorForAll('.sc-search-config-row')()
+    const nameSpans = await this.locatorForAll('.sc-search-config-row-name')()
+    for (let i = 0; i < rows.length; i++) {
+      if ((await nameSpans[i].text()).trim() === name) {
+        return rows[i]
+      }
     }
-    return row as HTMLElement
+    throw new Error(`No search-config row found for name "${name}"`)
   }
 
   /**
-   * The delete (trash) button rendered inside the config row for a given name, or `null` when the row is
-   * not deletable (no `SEARCHCONFIG#DELETE` permission or a read-only config) so the row renders no
-   * trash button.
+   * The delete (trash) button rendered inside the config row for a given name, as a `PButtonHarness`,
+   * or `null` when that row is not deletable (no `SEARCHCONFIG#DELETE` permission or a read-only
+   * config) so the row renders no trash button. The panel is opened first and the row's presence is
+   * checked (`getRowByName`), so a missing row throws; `null` (not a throw) is returned only for a
+   * row that exists but renders no trash button.
    */
-  async getDeleteButton(name: string): Promise<HTMLElement | null> {
-    const row = await this.getRowByName(name)
-    return row.querySelector('.sc-search-config-delete button.p-button') as HTMLElement | null
+  async getDeleteButton(name: string): Promise<PButtonHarness | null> {
+    await this.getRowByName(name)
+    const buttons = await this._deleteButtons()
+    for (const button of buttons) {
+      // The trash button only renders inside a row; scope it to the row for the given name so a
+      // deletable row's button is never matched for a non-deletable row (and vice versa).
+      const row = TestbedHarnessEnvironment.getNativeElement(await button.host()).closest('.sc-search-config-row')
+      if (row?.querySelector('.sc-search-config-row-name')?.textContent?.trim() === name) {
+        return button
+      }
+    }
+    return null
+  }
+
+  private async openPanel(): Promise<void> {
+    await (await this.getConfigSelect())?.open()
   }
 }

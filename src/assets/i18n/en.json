@@ -34,8 +34,8 @@
     },
     "DELETE": {
       "ARIA_LABEL": "Delete search config",
-      "ARIA_LABEL_NAMED": "Delete search config {{config}}",
-      "TOOLTIP": "Delete search config"
+      "TOOLTIP": "Delete search config",
+      "DELETE_KEY_HINT": "Press Delete to remove"
     },
     "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",
     "SEARCH_CRITERION_NAME": "Search criterion name",
@@ -63,6 +63,7 @@
       "HEADER": "Delete search config?",
       "MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
       "DELETE": "Delete",
+      "CANCEL": "Cancel",
       "SUCCESS": "Search config '{{config}}' deleted."
     },
     "DELETE_SUCCESS": "Successfully deleted search config",

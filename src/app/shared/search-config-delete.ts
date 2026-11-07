@@ -5,10 +5,7 @@ import { PortalDialogService } from '@onecx/angular-accelerator'
 import { PortalMessageService } from '@onecx/angular-integration-interface'
 
 import { SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
-
-// The delete-confirm dialog width token (see `--onecx-search-config-dialog-width` in `src/styles.scss`).
-// Applied through `PortalDialogConfig.width` so the dialog is the fixed width without a `#962` follow-up.
-export const SEARCH_CONFIG_DIALOG_WIDTH = 'var(--onecx-search-config-dialog-width)'
+import { SEARCH_CONFIG_DELETE_BUTTON_ID, SEARCH_CONFIG_DIALOG_WIDTH } from './constants'
 
 // TODO(#960): The `SEARCH_CONFIG.DELETE_DIALOG.{HEADER,MESSAGE,CONFIRM}` and `SEARCH_CONFIG.DELETE_SUCCESS`
 // i18n keys are legacy, kept only for the column remote until it reuses this helper and switches to the
@@ -25,15 +22,13 @@ export const SEARCH_CONFIG_DIALOG_WIDTH = 'var(--onecx-search-config-dialog-widt
  * @param searchConfigService  the API service that deletes the config.
  * @param messageService       the portal message service for the success and error toasts.
  * @param config               the search config to delete.
- * @param deleteButtonId       the fixed id of the Delete button (stable test/style anchor).
  * @returns an `Observable` that emits `true` once the config is deleted, `false` otherwise.
  */
 export function confirmAndDeleteSearchConfig(
   portalDialogService: PortalDialogService,
   searchConfigService: SearchConfigAPIService,
   messageService: PortalMessageService,
-  config: SearchConfigInfo,
-  deleteButtonId: string
+  config: SearchConfigInfo
 ): Observable<boolean> {
   return portalDialogService
     .openDialog(
@@ -46,10 +41,10 @@ export function confirmAndDeleteSearchConfig(
       },
       {
         key: 'SEARCH_CONFIG.DELETE_CONFIRM.DELETE',
-        id: deleteButtonId,
+        id: SEARCH_CONFIG_DELETE_BUTTON_ID,
         severity: 'danger'
       },
-      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
+      'SEARCH_CONFIG.DELETE_CONFIRM.CANCEL',
       { width: SEARCH_CONFIG_DIALOG_WIDTH }
     )
     .pipe(

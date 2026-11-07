@@ -34,8 +34,8 @@
     },
     "DELETE": {
       "ARIA_LABEL": "Suchkonfiguration löschen",
-      "ARIA_LABEL_NAMED": "Suchkonfiguration {{config}} löschen",
-      "TOOLTIP": "Suchkonfiguration löschen"
+      "TOOLTIP": "Suchkonfiguration löschen",
+      "DELETE_KEY_HINT": "Drücken Sie Löschen zum Entfernen"
     },
     "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",
     "SEARCH_CRITERION_NAME": "Suchkriterium-Name",
@@ -63,6 +63,7 @@
       "HEADER": "Suchkonfiguration löschen?",
       "MESSAGE": "Möchten Sie '{{config}}' wirklich löschen? Das kann nicht rückgängig gemacht werden.",
       "DELETE": "Löschen",
+      "CANCEL": "Abbrechen",
       "SUCCESS": "Suchkonfiguration '{{config}}' gelöscht."
     },
     "DELETE_SUCCESS": "Suchkonfiguration erfolgreich gelöscht",

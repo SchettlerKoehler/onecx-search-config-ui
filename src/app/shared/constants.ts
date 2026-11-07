@@ -14,3 +14,10 @@ export const SEARCH_CONFIG_SAVE_AS_BUTTON_ID = 'ocx-search-config-save-as-button
  * remote reuses the same dialog and Delete button unchanged.
  */
 export const SEARCH_CONFIG_DELETE_BUTTON_ID = 'ocx-search-config-delete-button'
+
+/**
+ * Delete-confirm dialog width, applied through `PortalDialogConfig.width`. Part of the same
+ * cross-remote contract as the fixed Delete id (see `--onecx-search-config-dialog-width` in
+ * `src/styles.scss`); both remotes open the dialog at this width unchanged.
+ */
+export const SEARCH_CONFIG_DIALOG_WIDTH = 'var(--onecx-search-config-dialog-width)'

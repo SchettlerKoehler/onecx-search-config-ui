@@ -31,7 +31,7 @@ import {
   provideRemoteComponentsServiceMock,
   provideShellCapabilityServiceMock
 } from '@onecx/angular-integration-interface/mocks'
-import { PSelectHarness, provideTranslateTestingService } from '@onecx/angular-testing'
+import { ListItemHarness, PSelectHarness, provideTranslateTestingService } from '@onecx/angular-testing'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 import { getWindowState } from '@onecx/angular-webcomponents'
 
@@ -44,18 +44,12 @@ import {
 } from 'src/app/shared/search-config.store'
 import { CreateOrEditSearchConfigDialogComponent } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
 import { Configuration, SearchConfigAPIService } from 'src/app/shared/generated'
-import {
-  advancedViewMode,
-  basicViewMode,
-  SEARCH_CONFIG_DELETE_BUTTON_ID,
-  SEARCH_CONFIG_SAVE_AS_BUTTON_ID
-} from 'src/app/shared/constants'
-import { SEARCH_CONFIG_DIALOG_WIDTH } from 'src/app/shared/search-config-delete'
+import { advancedViewMode, basicViewMode, SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 import { OneCXSearchConfigComponent } from './search-config.component'
 import { OneCXSearchConfigHarness } from './search-config.harness'
 import { searchConfigProviders } from './search-config.component.providers'
 
-const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: string]: any } => {
+const createSpyObj = (methodNames: Array<string>): { [key: string]: any } => {
   const obj: any = {}
 
   for (let i = 0; i < methodNames.length; i++) {
@@ -124,7 +118,7 @@ describe('OneCXSearchConfigComponent', () => {
   let store: SearchConfigStore
 
   const searchConfigServiceSpy = {
-    ...createSpyObj('searchConfigService', [
+    ...createSpyObj([
       'getSearchConfigInfos',
       'createSearchConfig',
       'deleteSearchConfig',
@@ -136,9 +130,9 @@ describe('OneCXSearchConfigComponent', () => {
     })
   } as SearchConfigAPIService
 
-  const portalDialogSpy = createSpyObj('portalDialogService', ['openDialog']) as PortalDialogService
+  const portalDialogSpy = createSpyObj(['openDialog']) as PortalDialogService
 
-  const portalMessageSpy = createSpyObj('portalMessageService', ['info', 'success', 'error']) as PortalMessageService
+  const portalMessageSpy = createSpyObj(['info', 'success', 'error']) as PortalMessageService
 
   let baseUrlSubject: ReplaySubject<any>
   beforeEach(() => {
@@ -203,6 +197,11 @@ describe('OneCXSearchConfigComponent', () => {
     component.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#DELETE']
     fixture.detectChanges()
 
+    // `PortalDialogService`, `SearchConfigAPIService` and `PortalMessageService` are all
+    // `providedIn: 'any'`, so the component's constructor injection resolves to a view-scoped
+    // instance that does not see the root TestBed `useValue` mocks above. Assigning the spies to the
+    // (private) fields is the load-bearing way to make the component exercise the mocks; dropping
+    // this line makes the component use the real services and the Save As / delete tests fail.
     ;(component as any).portalDialogService = portalDialogSpy
     ;(component as any).portalMessageService = portalMessageSpy
     ;(component as any).searchConfigService = searchConfigServiceSpy as any
@@ -863,28 +862,23 @@ describe('OneCXSearchConfigComponent', () => {
   })
 
   describe('on delete actions', () => {
-    it('should open the reusable delete dialog with the fixed Delete id, danger severity and dialog width when invoked', fakeAsync(() => {
+    it('should open the reusable delete dialog for the config when invoked', fakeAsync(() => {
       jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
       jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
 
       component.onSearchConfigDelete(config)
       tick(500)
 
+      // The exact openDialog argument list is asserted once in the helper spec; here only that the
+      // dialog was opened for the right config. `toHaveBeenCalledWith` requires the arity to match
+      // (openDialog takes five args), so the non-config args use lenient matchers: a later change to
+      // the dialog shape (button id/severity/width) is edited in the helper spec, not here.
       expect(portalDialogSpy.openDialog).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.DELETE_CONFIRM.HEADER',
-        {
-          key: 'SEARCH_CONFIG.DELETE_CONFIRM.MESSAGE',
-          parameters: {
-            config: config.name
-          }
-        },
-        {
-          key: 'SEARCH_CONFIG.DELETE_CONFIRM.DELETE',
-          id: SEARCH_CONFIG_DELETE_BUTTON_ID,
-          severity: 'danger'
-        },
-        'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
-        { width: SEARCH_CONFIG_DIALOG_WIDTH }
+        expect.anything(),
+        expect.objectContaining({ parameters: { config: config.name } }),
+        expect.anything(),
+        expect.anything(),
+        expect.anything()
       )
     }))
 
@@ -1228,9 +1222,14 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
   // The panel renders inside the <p-select> host (PrimeNG's default `self` appendTo), so it stays
   // scoped to this remote; tooltips append to `body` (forced). #getSelectItems resolves against the
   // document root and works; pick the wanted row from the returned list.
-  const findItemByText = async (items: Awaited<ReturnType<PSelectHarness['getSelectItems']>>, text: string) => {
+  //
+  // Rows are matched by their `<li>` `aria-label`, not their text: PrimeNG sets `aria-label` to the
+  // option label (the config name), while a deletable row's `<li>` text is polluted by the screen-reader
+  // keyboard-shortcut hint, so `getText()` is not a stable identity.
+  const itemAriaLabel = (item: ListItemHarness) => item.host().then((host) => host.getAttribute('aria-label'))
+  const findItemByAriaLabel = async (items: Awaited<ReturnType<PSelectHarness['getSelectItems']>>, name: string) => {
     for (const item of items) {
-      if ((await item.getText()) === text) {
+      if ((await itemAriaLabel(item)) === name) {
         return item
       }
     }
@@ -1238,6 +1237,14 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
   }
 
   const openItems = async () => (await harness()).getSelectItems()
+
+  // The combobox is the element PrimeNG keeps focused while the panel is open (`focusInputViewChild`,
+  // `role="combobox"`); the keyboard handler only reacts to a Delete pressed directly on it.
+  const comboboxOf = (select: Select): HTMLElement => {
+    const combobox = select.focusInputViewChild?.nativeElement
+    expect(combobox).toBeTruthy()
+    return combobox as HTMLElement
+  }
 
   const harness = async () =>
     (await TestbedHarnessEnvironment.documentRootLoader(hostFixture).getHarness(
@@ -1321,7 +1328,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     hostFixture = TestBed.createComponent(HostComponent)
     const child = hostFixture.debugElement.query(By.directive(OneCXSearchConfigComponent))!
     childComponent = child.componentInstance
-    childComponent.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#DELETE']
+    // `SEARCHCONFIG#CREATE` so the Save As button (rendered through a `SEARCHCONFIG#CREATE`-gated
+    // `<p-inputgroup-addon>`) is present; the group itself requires `SEARCHCONFIG#VIEW`.
+    childComponent.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#CREATE', 'SEARCHCONFIG#DELETE']
     hostFixture.detectChanges()
 
     childStore = TestBed.inject(SearchConfigStore)
@@ -1381,8 +1390,8 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await patchConfigs([config, onlyValuesConfig, onlyColumnsConfig])
 
     const items = await openItems()
-    const texts = await Promise.all(items.map((item) => item.getText()))
-    expect(texts).toEqual(['config-1', 'config-2'])
+    const names = await Promise.all(items.map((item) => itemAriaLabel(item)))
+    expect(names).toEqual(['config-1', 'config-2'])
   })
 
   it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
@@ -1408,7 +1417,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
 
     const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
     const items = await openItems()
-    const item = await findItemByText(items, 'config-1')
+    const item = await findItemByAriaLabel(items, 'config-1')
     expect(item).not.toBeNull()
     await (item as NonNullable<typeof item>).selectItem()
     await hostFixture.whenStable()
@@ -1424,24 +1433,18 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     const trashButton = await (await harness()).getDeleteButton(config.name)
     expect(trashButton).toBeTruthy()
 
-    ;(trashButton as HTMLButtonElement).click()
+    await (trashButton as NonNullable<typeof trashButton>).click()
     await hostFixture.whenStable()
 
+    // The exact openDialog argument list is asserted once in the helper spec; here only that the
+    // dialog was opened for the right config. `toHaveBeenCalledWith` requires the arity to match
+    // (openDialog takes five args), so the non-config args use lenient matchers.
     expect(portalDialogHostMock.openDialog).toHaveBeenCalledWith(
-      'SEARCH_CONFIG.DELETE_CONFIRM.HEADER',
-      {
-        key: 'SEARCH_CONFIG.DELETE_CONFIRM.MESSAGE',
-        parameters: {
-          config: config.name
-        }
-      },
-      {
-        key: 'SEARCH_CONFIG.DELETE_CONFIRM.DELETE',
-        id: SEARCH_CONFIG_DELETE_BUTTON_ID,
-        severity: 'danger'
-      },
-      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
-      { width: SEARCH_CONFIG_DIALOG_WIDTH }
+      expect.anything(),
+      expect.objectContaining({ parameters: { config: config.name } }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
     )
     // The trash click stops propagation, so the row is not selected.
     expect(changeSpy).not.toHaveBeenCalled()
@@ -1451,9 +1454,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     childComponent.permissions = ['SEARCHCONFIG#VIEW']
     await patchConfigs([config])
 
-    const row = await (await harness()).getRowByName(config.name)
-    expect(row).toBeTruthy()
-    expect(row.querySelector('.sc-search-config-delete')).toBeFalsy()
+    const h = await harness()
+    expect(await h.getRowByName(config.name)).toBeTruthy()
+    expect(await h.getDeleteButton(config.name)).toBeNull()
   })
 
   it('should keep the Save As button enabled and open the save dialog when clicked', async () => {
@@ -1502,70 +1505,102 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(saveAsButton.disabled).toBe(true)
   })
 
-  it('should delete the focused option when Delete is pressed on an open select', async () => {
+  it('should delete the focused option when Delete is pressed on the open select combobox', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
 
     await patchConfigs([config])
 
     const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
-    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
-
     const select = (childComponent as any).select() as Select
-    expect(select).toBeTruthy()
+    const combobox = comboboxOf(select)
 
-    // Guard branches (exercised by calling the handler directly so PrimeNG's own keydown side
-    // effects — e.g. Escape closing the panel — do not interfere):
-    // a non-Delete key is ignored regardless of panel state...
-    childComponent.onSearchConfigSelectKeydown({ code: 'Escape' } as KeyboardEvent)
-    expect(deleteSpy).not.toHaveBeenCalled()
-    // ...and Delete while the panel is closed is a no-op. (PrimeNG leaves `overlayVisible`
-    // undefined until the panel is shown, which the handler treats as closed.)
-    expect(select.overlayVisible).toBeFalsy()
-    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
-    expect(deleteSpy).not.toHaveBeenCalled()
-
-    // Open the panel (through the harness) and exercise the real DOM keydown path end-to-end.
+    // Open the panel (through the harness) and drive the real DOM keydown path end-to-end: a real
+    // ArrowDown focuses the (single) option, then Delete deletes it.
     const configSelect = await (await harness()).getConfigSelect()
     await configSelect?.open()
     await hostFixture.whenStable()
     expect(select.overlayVisible).toBe(true)
-    // No option is focused yet (default focusedOptionIndex is -1), so Delete is ignored.
     expect(select.focusedOptionIndex()).toBe(-1)
-    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }))
-    await hostFixture.whenStable()
-    expect(deleteSpy).not.toHaveBeenCalled()
 
-    // Focus the (single) option and press Delete again: the keyboard path deletes it.
-    select.focusedOptionIndex.set(0)
-    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }))
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    const deleteEvent = new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true })
+    combobox.dispatchEvent(deleteEvent)
     await hostFixture.whenStable()
     expect(deleteSpy).toHaveBeenCalledWith(config)
+    // The handler calls `preventDefault()` so the browser's default Delete is not also consumed.
+    expect(deleteEvent.defaultPrevented).toBe(true)
   })
 
-  it('should not delete via the keyboard path when the focused option is not deletable or is out of range', async () => {
+  it('should ignore a non-Delete key on the open select combobox', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    await patchConfigs([config])
 
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    // Focus the option so only the `event.code !== 'Delete'` guard can keep Delete from firing.
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    // A focused, deletable option plus an Enter key must not open the delete dialog (the `event.code !== 'Delete'` guard).
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when the Delete key is pressed inside the filter input', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    // Open the panel and focus an option. With `[filter]="true"`, PrimeNG focuses the filter input,
+    // and its keydown bubbles up to the `p-select` host, so a real Delete on the filter input must not
+    // trigger the delete shortcut (the `event.target !== focusInputViewChild` guard).
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLElement
+    expect(filterInput).toBeTruthy()
+    filterInput.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when the focused option is read-only or out of range', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
     await patchConfigs([config, readonlyConfig])
     await (await (await harness()).getConfigSelect())?.open()
     await hostFixture.whenStable()
 
     const select = (childComponent as any).select() as Select
-    expect(select.overlayVisible).toBe(true)
-
     const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const combobox = comboboxOf(select)
     const visibleOptions = select.visibleOptions()
 
-    // Focused on the read-only option: `canDelete` is false, so Delete is a no-op.
+    // Focused on the read-only option: `canDelete` is false, so a real Delete is a no-op.
     const readonlyIndex = visibleOptions.findIndex((option: any) => option.id === readonlyConfig.id)
     expect(readonlyIndex).toBeGreaterThanOrEqual(0)
     select.focusedOptionIndex.set(readonlyIndex)
-    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
     await hostFixture.whenStable()
     expect(deleteSpy).not.toHaveBeenCalled()
 
-    // Focused out of range: `visibleOptions()[index]` is undefined, so Delete is a no-op.
+    // Focused out of range: `visibleOptions()[index]` is undefined, so a real Delete is a no-op.
     select.focusedOptionIndex.set(visibleOptions.length)
-    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
     await hostFixture.whenStable()
     expect(deleteSpy).not.toHaveBeenCalled()
   })
@@ -1576,8 +1611,10 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // The row name renders the full config name and carries the `pTooltip` directive wired to the same
     // name with `showOnEllipsis`. The tooltip container only mounts once shown (and does not reliably
     // render in jsdom), so assert on the rendered full-name text and the directive instance's options.
-    const row = await (await harness()).getRowByName(config.name)
-    const nameSpan = row.querySelector('.sc-search-config-row-name') as HTMLElement
+    const h = await harness()
+    expect(await h.getRowByName(config.name)).toBeTruthy()
+    // A single config is patched, so there is exactly one row name span.
+    const nameSpan = hostFixture.nativeElement.querySelector('.sc-search-config-row-name') as HTMLElement
     expect(nameSpan).toBeTruthy()
     expect(nameSpan.textContent.trim()).toBe(config.name)
 
@@ -1590,13 +1627,17 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
   it('should clear the select and emit the cleared selection when the selected config is deleted', async () => {
     await patchConfigs([config, onlyValuesConfig])
 
-    // Seed the displayed data: the `searchConfigSelected` emission is driven by `currentConfig$`
-    // combined (via `withLatestFrom`) with `currentDisplayedData$`, which is filtered until
-    // `displayedSearchData` exists.
+    // Seed the displayed data (the page's own values and columns) and the displayed data: the
+    // `searchConfigSelected` emission is driven by `currentConfig$` combined (via `withLatestFrom`)
+    // with `currentDisplayedData$`, which is filtered until `displayedSearchData` exists.
+    const pageFieldValues = { my_k: 'my_v' }
+    const pageDisplayedColumnsIds = ['my_col']
     childStore.patchState({
+      fieldValues: pageFieldValues,
+      displayedColumnsIds: pageDisplayedColumnsIds,
       displayedSearchData: {
-        fieldValues: {},
-        displayedColumnsIds: [],
+        fieldValues: pageFieldValues,
+        displayedColumnsIds: pageDisplayedColumnsIds,
         viewMode: basicViewMode
       }
     })
@@ -1615,8 +1656,8 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of({ button: 'primary' } as any))
     ;(searchConfigServiceSpy.deleteSearchConfig as jest.Mock).mockReturnValue(of({} as any))
     const searchConfigSelectedSpy = jest.spyOn(childComponent.searchConfigSelected, 'emit')
-    const trashButton = (await (await harness()).getDeleteButton(config.name)) as HTMLButtonElement
-    trashButton.click()
+    const trashButton = await (await harness()).getDeleteButton(config.name)
+    await (trashButton as NonNullable<typeof trashButton>).click()
     await hostFixture.whenStable()
     // `store.deleteSearchConfig` runs in a `setTimeout` and `currentConfig$` is debounced (50ms).
     await delay(120)
@@ -1628,6 +1669,10 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // config, which surfaces as a cleared `searchConfigSelected`).
     expect(select.label()).toBe('p-emptylabel')
     expect(searchConfigSelectedSpy).toHaveBeenCalledWith(undefined)
+    // Deleting the config must not touch the page's own values and columns.
+    const state = childStore.state()
+    expect(state.fieldValues).toEqual(pageFieldValues)
+    expect(state.displayedColumnsIds).toEqual(pageDisplayedColumnsIds)
   })
 
   it('should show the filter placeholder and the no-match text for a non-matching filter', async () => {
@@ -1670,6 +1715,21 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await expect(h.getRowByName(onlyColumnsConfig.name)).rejects.toThrow(
       `No search-config row found for name "${onlyColumnsConfig.name}"`
     )
+  })
+
+  it('should render nothing when the SEARCHCONFIG#VIEW permission is missing', async () => {
+    // The remote is gated by `*ocxIfPermission="'SEARCHCONFIG#VIEW'"`, so with no permissions the whole
+    // control (the `p-inputgroup` and the `p-select` inside it) is absent.
+    childComponent.permissions = []
+    await patchConfigs([config])
+
+    expect(hostFixture.nativeElement.querySelector('p-inputgroup')).toBeNull()
+
+    // With no `p-select` rendered, the harness' `getConfigSelect()` is `null` and `getSelectItems()`
+    // falls back to an empty list rather than throwing.
+    const h = await harness()
+    expect(await h.getConfigSelect()).toBeNull()
+    expect(await h.getSelectItems()).toEqual([])
   })
 })
 

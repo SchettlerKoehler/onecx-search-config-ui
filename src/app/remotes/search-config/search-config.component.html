@@ -7,6 +7,7 @@
       <p-floatlabel variant="on">
         <p-select
           class="sc-search-config-select"
+          dataKey="id"
           [ngModel]="vm.currentConfig"
           (ngModelChange)="onSearchConfigChange($event)"
           [options]="vm.searchConfigs"
@@ -27,11 +28,7 @@
                 config.name
               }}</span>
               @if (canDelete(config)) {
-                <!-- tabindex="-1" + aria-hidden: the trash button is a visual affordance only. PrimeNG
-                     keeps focus on the combobox, so keyboard users delete via the Delete key on the
-                     focused option (see `onSearchConfigSelectKeydown`), not this button. (click) is the
-                     DOM handler — not (onClick) — because stopPropagation keeps the row from being
-                     selected, whereas Save As uses (onClick) since it needs no DOM event. -->
+                <span class="sr-only">{{ 'SEARCH_CONFIG.DELETE.DELETE_KEY_HINT' | translate }}</span>
                 <p-button
                   class="sc-search-config-delete"
                   [icon]="deleteIcon"
@@ -39,30 +36,32 @@
                   severity="danger"
                   [tabindex]="-1"
                   aria-hidden="true"
-                  [ariaLabel]="'SEARCH_CONFIG.DELETE.ARIA_LABEL_NAMED' | translate: { config: config.name }"
                   (click)="onSearchConfigDelete(config); $event.stopPropagation()"
                 ></p-button>
               }
             </div>
           </ng-template>
         </p-select>
-        <label class="sc-search-config-label" id="sc_search_config_label">
+        <label class="sc-search-config-label" id="sc_search_config_label" for="sc_search_config_select">
           {{
             (vm.searchConfigs.length === 0 ? 'SEARCH_CONFIG.SELECT.NO_CONFIGS_LABEL' : 'SEARCH_CONFIG.SELECT.LABEL')
               | translate
           }}
         </label>
       </p-floatlabel>
-      <p-button
-        [id]="saveAsButtonId"
+      <p-inputgroup-addon
         class="sc-search-config-save-as"
-        [label]="'SEARCH_CONFIG.SAVE_AS.LABEL' | translate"
-        [icon]="saveAsIcon"
-        severity="primary"
-        [disabled]="vm.editMode"
-        [ariaLabel]="'SEARCH_CONFIG.SAVE_AS.ARIA_LABEL' | translate"
-        (onClick)="onSearchConfigSave(vm)"
-      ></p-button>
+        *ocxIfPermission="'SEARCHCONFIG#CREATE'; permissions: permissions"
+      >
+        <p-button
+          [id]="saveAsButtonId"
+          [label]="'SEARCH_CONFIG.SAVE_AS.LABEL' | translate"
+          [icon]="saveAsIcon"
+          [disabled]="vm.editMode"
+          [ariaLabel]="'SEARCH_CONFIG.SAVE_AS.ARIA_LABEL' | translate"
+          (onClick)="onSearchConfigSave(vm)"
+        ></p-button>
+      </p-inputgroup-addon>
     </p-inputgroup>
   }
 </div>
