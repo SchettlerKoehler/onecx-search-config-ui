@@ -8,8 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "EDITING": "{{config}} Suchkonfiguration bearbeiten",
-    "ACTIVE": "Aktiv: {{config}}",
     "SAVE_EDIT": {
       "LABEL": "Speichern",
       "ARIA_LABEL": "Suchkonfiguration speichern",
@@ -21,18 +19,14 @@
       "TOOLTIP": "Bearbeitung der Suchkonfiguration abbrechen"
     },
     "SELECT": {
-      "LABEL": "Auswählen",
-      "ARIA_LABEL": "Suchkonfiguration auswählen",
-      "TOOLTIP": "Suchkonfiguration auswählen"
+      "LABEL": "Suchkonfiguration",
+      "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
+      "FILTER_PLACEHOLDER": "Nach Name filtern",
+      "NO_MATCH": "Keine passenden Suchkonfigurationen"
     },
-    "MANAGE": {
-      "LABEL": "Suchkonfigurationen verwalten",
-      "ARIA_LABEL": "Suchkonfigurationen verwalten",
-      "TOOLTIP": "Suchkonfigurationen verwalten"
-    },
-    "ADD": {
-      "ARIA_LABEL": "Suchkonfiguration hinzufügen",
-      "TOOLTIP": "Suchkonfiguration hinzufügen"
+    "SAVE_AS": {
+      "LABEL": "Speichern unter",
+      "ARIA_LABEL": "Als neue Suchkonfiguration speichern"
     },
     "EDIT": {
       "ARIA_LABEL": "Suchkonfiguration bearbeiten",
@@ -40,7 +34,8 @@
     },
     "DELETE": {
       "ARIA_LABEL": "Suchkonfiguration löschen",
-      "TOOLTIP": "Suchkonfiguration löschen"
+      "TOOLTIP": "Suchkonfiguration löschen",
+      "DELETE_KEY_HINT": "Drücken Sie Löschen zum Entfernen"
     },
     "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",
     "SEARCH_CRITERION_NAME": "Suchkriterium-Name",
@@ -63,6 +58,13 @@
       "MESSAGE": "Sind Sie sicher, dass Sie die Suchkonfiguration {{config}} löschen möchten?",
       "CONFIRM": "Bestätigen",
       "CANCEL": "Abbrechen"
+    },
+    "DELETE_CONFIRM": {
+      "HEADER": "Suchkonfiguration löschen?",
+      "MESSAGE": "Möchten Sie '{{config}}' wirklich löschen? Das kann nicht rückgängig gemacht werden.",
+      "DELETE": "Löschen",
+      "CANCEL": "Abbrechen",
+      "SUCCESS": "Suchkonfiguration '{{config}}' gelöscht."
     },
     "DELETE_SUCCESS": "Suchkonfiguration erfolgreich gelöscht",
     "DELETE_FAILURE": "Fehler beim Löschen der Suchkonfiguration",

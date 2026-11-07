@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing'
-import { take } from 'rxjs'
+import { firstValueFrom, take } from 'rxjs'
 
 import { FakeTopic } from '@onecx/accelerator'
 
@@ -72,6 +72,20 @@ describe('SearchConfigStore', () => {
     store = new SearchConfigStore('store-1', mockSearchConfigStoreTopic as any as SearchConfigTopic)
 
     secondStore = new SearchConfigStore('store-2', mockSearchConfigStoreTopic as any as SearchConfigTopic)
+  })
+
+  describe('searchConfigVm$ selector', () => {
+    it('should expose only configs with values and no current config in the view model', async () => {
+      store.patchState({
+        searchConfigs: [testConfigBase, testConfigOnlyValues, testConfigOnlyColumns],
+        currentSearchConfig: undefined
+      })
+
+      const vm = await firstValueFrom(store.searchConfigVm$)
+
+      expect(vm.searchConfigs.map((item) => item.name)).toEqual([testConfigBase.name, testConfigOnlyValues.name])
+      expect(vm.currentConfig).toBeUndefined()
+    })
   })
 
   describe('activate store', () => {

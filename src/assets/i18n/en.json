@@ -8,9 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "EDITING": "Editing: {{config}}",
-    "ACTIVE": "Active: {{config}}",
-    "SEARCH_CONFIG_LIST": "Search configs",
     "SAVE_EDIT": {
       "LABEL": "Save",
       "ARIA_LABEL": "Save search config",
@@ -22,18 +19,14 @@
       "TOOLTIP": "Stop editing search config"
     },
     "SELECT": {
-      "LABEL": "Select",
-      "ARIA_LABEL": "Select search config",
-      "TOOLTIP": "Select search config"
+      "LABEL": "Search Config",
+      "NO_CONFIGS_LABEL": "No search configs",
+      "FILTER_PLACEHOLDER": "Filter by name",
+      "NO_MATCH": "No matching configs"
     },
-    "MANAGE": {
-      "LABEL": "Manage search configs",
-      "ARIA_LABEL": "Manage search configs",
-      "TOOLTIP": "Manage search configs"
-    },
-    "ADD": {
-      "ARIA_LABEL": "Add search config",
-      "TOOLTIP": "Add search config"
+    "SAVE_AS": {
+      "LABEL": "Save As",
+      "ARIA_LABEL": "Save as new search config"
     },
     "EDIT": {
       "ARIA_LABEL": "Edit search config",
@@ -41,7 +34,8 @@
     },
     "DELETE": {
       "ARIA_LABEL": "Delete search config",
-      "TOOLTIP": "Delete search config"
+      "TOOLTIP": "Delete search config",
+      "DELETE_KEY_HINT": "Press Delete to remove"
     },
     "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",
     "SEARCH_CRITERION_NAME": "Search criterion name",
@@ -64,6 +58,13 @@
       "MESSAGE": "Are you sure you want to delete search config {{config}}",
       "CONFIRM": "Confirm",
       "CANCEL": "Cancel"
+    },
+    "DELETE_CONFIRM": {
+      "HEADER": "Delete search config?",
+      "MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
+      "DELETE": "Delete",
+      "CANCEL": "Cancel",
+      "SUCCESS": "Search config '{{config}}' deleted."
     },
     "DELETE_SUCCESS": "Successfully deleted search config",
     "DELETE_FAILURE": "Failed to delete search config",

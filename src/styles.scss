@@ -10,3 +10,106 @@
 .p-popover:after {
   right: 1rem !important;
 }
+
+/*
+ * Search-config design tokens.
+ *
+ * Every value is a PrimeNG design token or another --onecx-search-config-* variable. No
+ * hard-coded colors or sizes are used (the four fixed rem dimensions below are the app-owned
+ * layout decisions for which PrimeNG provides no token). Later tickets must keep this rule:
+ * PrimeNG tokens or --onecx-search-config-* only, defined here in styles.scss.
+ */
+:root {
+  /* Whole input group (select + joined Save As). App-owned: PrimeNG has no width token for it. */
+  --onecx-search-config-width: 18rem;
+  /* Control height. App-owned: PrimeNG sizes the select control from padding, not a height token. */
+  --onecx-search-config-height: 2.5rem;
+  /* Corner radius of the control, matched to the PrimeNG select token. */
+  --onecx-search-config-radius: var(--p-select-border-radius);
+  /* Control border color — reserved for a later ticket (no selector reads it yet, so applying the
+   * select border color via this variable would be dead CSS, like the marker/group-header tokens). */
+  --onecx-search-config-border-color: var(--p-select-border-color);
+  /* Maximum height of the opened option list (overlay) before it scrolls. Matches the prototype. */
+  --onecx-search-config-panel-max-height: 16rem;
+  /* Delete (trash) icon color — the PrimeNG danger (red) button color. */
+  --onecx-search-config-delete-color: var(--p-button-danger-background);
+  /* Light-red hover background behind the trash icon (PrimeNG text-danger hover tint). */
+  --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
+  /* Color of the "modified" marker on a config row (used by a later ticket). */
+  --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
+  /* Color of a config option-group header in the list (used by a later ticket). */
+  --onecx-search-config-group-header-color: var(--p-select-option-group-color);
+  /* Width of the reusable delete-confirm dialog (applied via PortalDialogConfig.width). */
+  --onecx-search-config-dialog-width: 30rem;
+}
+
+/*
+ * Search header remote: the config select joined to the Save As button.
+ *
+ * Selectors are rooted at the remote's host element (ocx-search-config-component, registered as
+ * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
+ * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the
+ * host element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips
+ * append to `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The
+ * delete-confirm dialog is portaled outside the remote element and is sized and reached by the
+ * host through data-style-id scoping (see the README).
+ */
+ocx-search-config-component {
+  .sc-search-config-group {
+    width: var(--onecx-search-config-width);
+
+    /* Drive the control's corner radius through the input-group token so PrimeNG's own
+     * first/last-child rules round the select's start corners and the joined Save As addon's end
+     * corners. A flat `border-radius` or the scoped longhands here would lose to PrimeNG's
+     * higher-specificity rules; the custom property wins by cascade instead. When the Save As
+     * addon is absent (no `SEARCHCONFIG#CREATE`), the float label is the group's last child, so the
+     * same token rounds the select's end corners too — no separate `.no-save` rule needed. */
+    --p-inputgroup-addon-border-radius: var(--onecx-search-config-radius);
+  }
+
+  .sc-search-config-select {
+    height: var(--onecx-search-config-height);
+  }
+
+  /* Config-select option list: single-line rows (ellipsis + tooltip). */
+  .sc-search-config-panel {
+    .sc-search-config-row {
+      display: flex;
+      align-items: center;
+      /* Spacing between the config name and its delete affordance. PrimeNG select-list gap token. */
+      gap: var(--p-select-list-gap);
+      width: 100%;
+    }
+
+    .sc-search-config-row-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. The
+     * :root variables drive the button through these scoped PrimeNG danger-token overrides. */
+    .sc-search-config-delete {
+      flex: 0 0 auto;
+      margin: 0;
+      --p-button-text-danger-color: var(--onecx-search-config-delete-color);
+      --p-button-text-danger-hover-background: var(--onecx-search-config-delete-hover-background);
+    }
+  }
+
+  /* The joined Save As button is wrapped in a `p-inputgroupaddon`: PrimeNG zeroes the inner button's
+   * corners and the group's `--p-inputgroup-addon-border-radius` token (set on `.sc-search-config-group`)
+   * rounds the addon's outer (end) corners, joining it to the select's start corners. The addon's
+   * default form-field border (top/bottom and the trailing edge) is retinted to the primary button's
+   * border color so it blends into the blue Save As button instead of drawing a grey hairline. */
+  .sc-search-config-save-as {
+    height: var(--onecx-search-config-height);
+    --p-inputgroup-addon-border-color: var(--p-button-primary-border-color);
+
+    .p-button {
+      height: 100%;
+    }
+  }
+}

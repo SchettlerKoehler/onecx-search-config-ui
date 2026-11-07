@@ -1,14 +1,6 @@
 import { AsyncPipe, Location } from '@angular/common'
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  Inject,
-  Input,
-  OnDestroy,
-  ViewChild,
-  ChangeDetectionStrategy
-} from '@angular/core'
+import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy, viewChild } from '@angular/core'
+import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import {
   OperatorFunction,
@@ -25,10 +17,12 @@ import {
 } from 'rxjs'
 
 import { ButtonModule } from 'primeng/button'
-import { Popover, PopoverModule } from 'primeng/popover'
 import { PrimeIcons } from 'primeng/api'
+import { Select, SelectModule } from 'primeng/select'
+import { FloatLabelModule } from 'primeng/floatlabel'
+import { InputGroupModule } from 'primeng/inputgroup'
+import { InputGroupAddonModule } from 'primeng/inputgroupaddon'
 import { TooltipModule } from 'primeng/tooltip'
-import { FocusTrapModule } from 'primeng/focustrap'
 
 import { AngularAcceleratorModule, SearchConfigData, PortalDialogService } from '@onecx/angular-accelerator'
 import { AppStateService, PortalMessageService, UserService } from '@onecx/angular-integration-interface'
@@ -43,10 +37,8 @@ import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-u
 import {
   Configuration,
   CreateSearchConfigRequest,
-  SearchConfig,
   SearchConfigAPIService,
-  SearchConfigInfo,
-  UpdateSearchConfigRequest
+  SearchConfigInfo
 } from 'src/app/shared/generated'
 import {
   PageData,
@@ -58,8 +50,15 @@ import {
   CreateOrEditSearchConfigDialogComponent,
   CreateOrEditSearchDialogContent
 } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
-import { advancedViewMode, advancedViewModeType, basicViewMode, basicViewModeType } from 'src/app/shared/constants'
+import {
+  advancedViewMode,
+  advancedViewModeType,
+  basicViewMode,
+  basicViewModeType,
+  SEARCH_CONFIG_SAVE_AS_BUTTON_ID
+} from 'src/app/shared/constants'
 import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
+import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
 import { environment } from 'src/environments/environment'
 
 @Component({
@@ -72,10 +71,13 @@ import { environment } from 'src/environments/environment'
     AsyncPipe,
     AngularAcceleratorModule,
     TranslateModule,
+    FormsModule,
     ButtonModule,
-    PopoverModule,
-    TooltipModule,
-    FocusTrapModule
+    SelectModule,
+    FloatLabelModule,
+    InputGroupModule,
+    InputGroupAddonModule,
+    TooltipModule
   ]
 })
 export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemoteWebcomponent, OnDestroy {
@@ -101,22 +103,17 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
 
   readonly vm$ = this.searchConfigStore.searchConfigVm$.pipe(debounceTime(50))
 
+  // The config select, read for the keyboard delete shortcut (see `onSearchConfigSelectKeydown`).
+  readonly select = viewChild(Select)
+
   dataRevertSub: Subscription | undefined
   currentConfigSub: Subscription | undefined
 
-  baseOptions: any[] = []
-  plusIcon = PrimeIcons.PLUS
-  editIcon = PrimeIcons.PENCIL
+  saveAsIcon = PrimeIcons.SAVE
   deleteIcon = PrimeIcons.TRASH
-  stopIcon = PrimeIcons.TIMES
-  saveIcon = PrimeIcons.CHECK
-  selectIcon = PrimeIcons.CHECK
+  saveAsButtonId = SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 
   permissions: string[] = []
-
-  @ViewChild('op') op: Popover | undefined
-  @ViewChild('manageButton', { read: ElementRef })
-  manageButton?: ElementRef<HTMLButtonElement>
 
   constructor(
     @Inject(REMOTE_COMPONENT_CONFIG)
@@ -209,53 +206,17 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
     })
     this.baseUrl.next(config)
     this.permissions = config.permissions
-    if (config.permissions.includes('SEARCHCONFIG#CREATE')) {
-      this.baseOptions = [
-        {
-          id: 'ocx-add-search-config-option'
-        }
-      ]
-    }
-  }
-
-  focusManageButton() {
-    this.manageButton?.nativeElement.focus()
-  }
-
-  overlayButtonText(vm: SearchConfigViewModel): {
-    key: string
-    params?: any
-  } {
-    if (vm.editMode && vm.currentConfig) {
-      return {
-        key: 'SEARCH_CONFIG.EDITING',
-        params: { config: vm.currentConfig.name }
-      }
-    }
-    const currentConfig = vm.currentConfig
-    if (currentConfig && vm.searchConfigs.some((c) => c.name === currentConfig.name)) {
-      return {
-        key: 'SEARCH_CONFIG.ACTIVE',
-        params: { config: currentConfig.name }
-      }
-    }
-    return { key: 'SEARCH_CONFIG.MANAGE.LABEL' }
   }
 
   onSearchConfigChange(value: SearchConfigInfo) {
-    this.op?.hide()
-
     setTimeout(() => {
       this.searchConfigStore.setCurrentConfig(value)
     })
   }
 
   onSearchConfigSave(vm: SearchConfigViewModel) {
-    this.op?.hide()
-
-    setTimeout(() => {
-      this.searchConfigStore.setCurrentConfig(undefined)
-    })
+    // The selection is not cleared up front so a cancelled or failed create leaves the current
+    // selection intact in the select.
 
     let frozeColumnSaveOptionExplanation = ''
 
@@ -315,131 +276,61 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       })
   }
 
-  onSearchConfigEdit(searchConfig: SearchConfigInfo) {
-    this.op?.hide()
-
-    setTimeout(() => {
-      this.searchConfigStore.enterEditMode(searchConfig)
-    })
+  // Structural directives (ocxIfPermission/ngIf) are not rendered inside PrimeNG's #item template,
+  // so the delete affordance is gated by this helper: the SEARCHCONFIG#DELETE permission plus the
+  // read-only flag. Read-only or un-privileged rows render no trash button.
+  canDelete(searchConfig: SearchConfigInfo) {
+    return this.permissions.includes('SEARCHCONFIG#DELETE') && !searchConfig.isReadonly
   }
 
-  onSearchConfigSaveEdit(vm: SearchConfigViewModel) {
-    const searchConfig = vm.currentConfig
-
-    if (!searchConfig) {
-      setTimeout(() => {
-        this.searchConfigStore.cancelEdit()
-      })
-      return
-    }
-
-    this.portalDialogService
-      .openDialog<CreateOrEditSearchDialogContent>(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: searchConfig.name,
-            saveInputValues: Object.keys(searchConfig.values ?? {}).length > 0,
-            saveColumns: (searchConfig.columns ?? []).length > 0,
-            frozeColumnSaveOption: !(vm.isColumnGroupComponentActive && vm.layout === 'table'),
-            frozeColumnSaveOptionExplanation: this.getFrozeColumnSaveOptionExplanation(vm)
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-      .pipe(
-        mergeMap((dialogResult) => {
-          return this.getSearchConfig(searchConfig).pipe(
-            map((response) => {
-              return {
-                config: response?.config,
-                result: dialogResult
-              }
-            })
-          )
-        }),
-        withLatestFrom(this.searchConfigStore.currentPageData$),
-        mergeMap(([{ config, result }, pageData]) => {
-          if (!config || !result) {
-            return of(undefined)
-          }
-          if (result.button !== 'primary') {
-            return of(undefined)
-          }
-          return this.editSearchConfig(config, result.result, pageData, vm)
-        })
-      )
-      .subscribe((response) => {
-        const config = response?.configs.find((c) => c.id === searchConfig.id)
-        if (response && config) {
-          this.portalMessageService.info({
-            summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_SUCCESS'
-          })
-          setTimeout(() => {
-            this.searchConfigStore.saveEdit(config)
-          })
-        } else {
-          setTimeout(() => {
-            this.searchConfigStore.cancelEdit()
-          })
-        }
-      })
-  }
-
-  onSearchConfigCancelEdit() {
-    setTimeout(() => {
-      this.searchConfigStore.cancelEdit()
-    })
+  // Whether at least one listed option is deletable; the screen-reader delete-key hint is rendered
+  // (and wired to the combobox via `aria-describedby`) only when there is a deletable option.
+  hasDeletableConfig(searchConfigs: SearchConfigInfo[]) {
+    return searchConfigs.some((searchConfig) => this.canDelete(searchConfig))
   }
 
   onSearchConfigDelete(searchConfig: SearchConfigInfo) {
-    this.op?.hide()
-
-    this.portalDialogService
-      .openDialog(
-        'SEARCH_CONFIG.DELETE_DIALOG.HEADER',
-        {
-          key: 'SEARCH_CONFIG.DELETE_DIALOG.MESSAGE',
-          parameters: {
-            config: searchConfig.name
-          }
-        },
-        'SEARCH_CONFIG.DELETE_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.DELETE_DIALOG.CANCEL'
-      )
-      .pipe(
-        mergeMap((dialogResult) => {
-          if (!dialogResult) return of(undefined)
-          if (dialogResult.button !== 'primary') {
-            return of(undefined)
-          }
-          return this.deleteSearchConfig(searchConfig.id)
+    // The dialog, delete call and toasts live in the shared `confirmAndDeleteSearchConfig` helper; on
+    // success we just remove the deleted config from the store.
+    confirmAndDeleteSearchConfig(
+      this.portalDialogService,
+      this.searchConfigService,
+      this.portalMessageService,
+      searchConfig
+    ).subscribe((deleted) => {
+      if (deleted) {
+        setTimeout(() => {
+          this.searchConfigStore.deleteSearchConfig(searchConfig)
         })
-      )
-      .subscribe((result) => {
-        if (result !== undefined) {
-          this.portalMessageService.info({
-            summaryKey: 'SEARCH_CONFIG.DELETE_SUCCESS'
-          })
-          setTimeout(() => {
-            this.searchConfigStore.deleteSearchConfig(searchConfig)
-          })
-        }
-      })
+      }
+    })
   }
 
-  private deleteSearchConfig(id: string) {
-    return this.searchConfigService.deleteSearchConfig(id).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.DELETE_FAILURE'
-        })
-        return of(undefined)
-      })
-    )
+  // Keyboard delete path (WCAG 2.1.1): PrimeNG keeps focus on the select combobox and moves between
+  // options with `aria-activedescendant`, so Tab never reaches the trash button nested inside a row.
+  // The handler is bound on the `p-select` host, so it also receives keydown bubbled up from the
+  // filter input (PrimeNG autofocuses it when the panel opens); only act on the Delete pressed on the
+  // combobox itself so editing the filter text never triggers a delete. PrimeNG's own Delete handler
+  // is a no-op here (`showClear` is not set) and does not stop the event, so this fires after it.
+  onSearchConfigSelectKeydown(event: KeyboardEvent): void {
+    const select = this.select()
+    if (event.code !== 'Delete' || !select?.overlayVisible) {
+      return
+    }
+    // Ignore the bubbled Delete of elements inside the overlay (notably the filter input) — the shortcut
+    // only applies to the combobox itself.
+    if (event.target !== select.focusInputViewChild?.nativeElement) {
+      return
+    }
+    const focusedIndex = select.focusedOptionIndex()
+    if (focusedIndex < 0) {
+      return
+    }
+    const option = select.visibleOptions()[focusedIndex] as SearchConfigInfo | undefined
+    if (option && this.canDelete(option)) {
+      event.preventDefault()
+      this.onSearchConfigDelete(option)
+    }
   }
 
   private saveSearchConfig(
@@ -468,59 +359,5 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
         return of(undefined)
       })
     )
-  }
-
-  private getSearchConfig(searchConfig: SearchConfigInfo) {
-    return this.searchConfigService.getSearchConfig(searchConfig.id).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.FETCH_FAILURE'
-        })
-        return of(undefined)
-      })
-    )
-  }
-
-  private editSearchConfig(
-    config: SearchConfig,
-    configData: CreateOrEditSearchDialogContent | undefined,
-    data: PageData,
-    vm: SearchConfigViewModel
-  ) {
-    let columns = config.columns
-
-    if (vm.isColumnGroupComponentActive && vm.layout === 'table') {
-      columns = configData?.saveColumns ? data.displayedColumnsIds : []
-    }
-
-    const request: UpdateSearchConfigRequest = {
-      searchConfig: {
-        ...config,
-        name: configData?.searchConfigName ?? config.name ?? '',
-        columns,
-        values: configData?.saveInputValues ? parseFieldValues(data.fieldValues ?? {}) : {},
-        isAdvanced: data.viewMode === advancedViewMode
-      }
-    }
-    return this.searchConfigService.updateSearchConfig(config.id, request).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_FAILURE'
-        })
-        return of(undefined)
-      })
-    )
-  }
-
-  private getFrozeColumnSaveOptionExplanation(vm: SearchConfigViewModel): string {
-    if (!vm.isColumnGroupComponentActive) {
-      return 'SEARCH_CONFIG.COLUMN_GROUP_COMPONENT_INACTIVE'
-    }
-    if (vm.layout !== 'table') {
-      return 'SEARCH_CONFIG.TABLE_VIEW_INACTIVE'
-    }
-    return ''
   }
 }

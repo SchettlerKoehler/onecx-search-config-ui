@@ -1,11 +1,22 @@
 import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
-import { createApplication } from '@angular/platform-browser'
-import { EnvironmentProviders, NgZone, Provider, ɵNoopNgZone as NoopNgZone } from '@angular/core'
+import { By, createApplication } from '@angular/platform-browser'
+import {
+  Component,
+  EnvironmentProviders,
+  Injector,
+  NgZone,
+  Provider,
+  runInInjectionContext,
+  ɵNoopNgZone as NoopNgZone
+} from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
-import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
+import { ReplaySubject, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
+import { Select } from 'primeng/select'
+import { Tooltip } from 'primeng/tooltip'
 
 import { FakeTopic } from '@onecx/accelerator'
 import { PortalDialogService } from '@onecx/angular-accelerator'
@@ -33,11 +44,12 @@ import {
 } from 'src/app/shared/search-config.store'
 import { CreateOrEditSearchConfigDialogComponent } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
 import { Configuration, SearchConfigAPIService } from 'src/app/shared/generated'
-import { advancedViewMode, basicViewMode } from 'src/app/shared/constants'
+import { advancedViewMode, basicViewMode, SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 import { OneCXSearchConfigComponent } from './search-config.component'
+import { OneCXSearchConfigHarness } from './search-config.harness'
 import { searchConfigProviders } from './search-config.component.providers'
 
-const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: string]: any } => {
+const createSpyObj = (methodNames: Array<string>): { [key: string]: any } => {
   const obj: any = {}
 
   for (let i = 0; i < methodNames.length; i++) {
@@ -47,13 +59,66 @@ const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: str
   return obj
 }
 
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+type SearchConfigFixture = {
+  id: string
+  name: string
+  columns: string[]
+  values: Record<string, string>
+  isReadonly: boolean
+  isAdvanced: boolean
+}
+
+const config: SearchConfigFixture = {
+  id: '1',
+  name: 'config-1',
+  columns: ['col-1'],
+  values: {
+    k1: 'v1'
+  },
+  isReadonly: false,
+  isAdvanced: false
+}
+
+const readonlyConfig: SearchConfigFixture = {
+  id: '4',
+  name: 'config-readonly',
+  columns: ['col-4'],
+  values: {
+    k4: 'v4'
+  },
+  isReadonly: true,
+  isAdvanced: false
+}
+
+const onlyValuesConfig: SearchConfigFixture = {
+  id: '2',
+  name: 'config-2',
+  columns: [],
+  values: {
+    k2: 'v2'
+  },
+  isReadonly: false,
+  isAdvanced: false
+}
+
+const onlyColumnsConfig: SearchConfigFixture = {
+  id: '3',
+  name: 'config-3',
+  columns: ['col-3'],
+  values: {},
+  isReadonly: false,
+  isAdvanced: false
+}
+
 describe('OneCXSearchConfigComponent', () => {
   let component: OneCXSearchConfigComponent
   let fixture: ComponentFixture<OneCXSearchConfigComponent>
   let store: SearchConfigStore
 
   const searchConfigServiceSpy = {
-    ...createSpyObj('searchConfigService', [
+    ...createSpyObj([
       'getSearchConfigInfos',
       'createSearchConfig',
       'deleteSearchConfig',
@@ -65,44 +130,27 @@ describe('OneCXSearchConfigComponent', () => {
     })
   } as SearchConfigAPIService
 
-  const portalDialogSpy = createSpyObj('portalDialogService', ['openDialog']) as PortalDialogService
+  const portalDialogSpy = createSpyObj(['openDialog']) as PortalDialogService
 
-  const portalMessageSpy = createSpyObj('portalMessageService', ['info', 'error']) as PortalMessageService
-
-  const config = {
-    id: '1',
-    name: 'config-1',
-    columns: ['col-1'],
-    values: {
-      k1: 'v1'
-    },
-    isReadonly: false,
-    isAdvanced: false
-  }
-
-  const onlyValuesConfig = {
-    id: '2',
-    name: 'config-2',
-    columns: [],
-    values: {
-      k2: 'v2'
-    },
-    isReadonly: false,
-    isAdvanced: false
-  }
-
-  const onlyColumnsConfig = {
-    id: '3',
-    name: 'config-3',
-    columns: ['col-3'],
-    values: {},
-    isReadonly: false,
-    isAdvanced: false
-  }
+  const portalMessageSpy = createSpyObj(['info', 'success', 'error']) as PortalMessageService
 
   let baseUrlSubject: ReplaySubject<any>
   beforeEach(() => {
     baseUrlSubject = new ReplaySubject<any>(1)
+    // `PortalDialogService`, `PortalMessageService` and `SearchConfigAPIService` are all
+    // `providedIn: 'any'`, so the component's constructor injection resolves to a view-scoped
+    // instance that does not see a root TestBed `useValue`. Override the component so the component
+    // injects the spies through DI (rather than mutating its private fields), matching the
+    // host-element suite below.
+    TestBed.overrideComponent(OneCXSearchConfigComponent, {
+      add: {
+        providers: [
+          { provide: PortalDialogService, useValue: portalDialogSpy },
+          { provide: PortalMessageService, useValue: portalMessageSpy },
+          { provide: SearchConfigAPIService, useValue: searchConfigServiceSpy }
+        ]
+      }
+    })
     TestBed.configureTestingModule({
       declarations: [],
       imports: [OneCXSearchConfigComponent, NoopAnimationsModule],
@@ -129,19 +177,7 @@ describe('OneCXSearchConfigComponent', () => {
           provide: SEARCH_CONFIG_TOPIC,
           useValue: new FakeTopic<SearchConfigMessage>()
         },
-        DialogService,
-        {
-          provide: PortalDialogService,
-          useValue: portalDialogSpy
-        },
-        {
-          provide: PortalMessageService,
-          useValue: portalMessageSpy
-        },
-        {
-          provide: SearchConfigAPIService,
-          useValue: searchConfigServiceSpy
-        }
+        DialogService
       ]
     }).compileComponents()
 
@@ -158,11 +194,10 @@ describe('OneCXSearchConfigComponent', () => {
 
     fixture = TestBed.createComponent(OneCXSearchConfigComponent)
     component = fixture.componentInstance
+    // The root template is gated by *ocxIfPermission="'SEARCHCONFIG#VIEW'; permissions: permissions".
+    // Grant the permissions before the first change detection so the header renders.
+    component.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#DELETE']
     fixture.detectChanges()
-
-    ;(component as any).portalDialogService = portalDialogSpy
-    ;(component as any).portalMessageService = portalMessageSpy
-    ;(component as any).searchConfigService = searchConfigServiceSpy as any
 
     store = TestBed.inject(SearchConfigStore)
   })
@@ -188,6 +223,20 @@ describe('OneCXSearchConfigComponent', () => {
 
     expect(spy).toHaveBeenCalledWith('my-page')
   }))
+
+  it('should update store on current field values input set', fakeAsync(() => {
+    const spy = jest.spyOn(store, 'updateFieldValues')
+
+    component.currentFieldValues = { k: 'v' }
+    tick(500)
+
+    expect(spy).toHaveBeenCalledWith({ k: 'v' })
+  }))
+
+  it('should unsubscribe its subscriptions on destroy', () => {
+    expect(() => component.ngOnDestroy()).not.toThrow()
+    expect(() => component.ngOnDestroy()).not.toThrow()
+  })
 
   describe('setup', () => {
     it('should init remote component', (done) => {
@@ -241,15 +290,21 @@ describe('OneCXSearchConfigComponent', () => {
         }
       } as any
 
-      const localComponent = new OneCXSearchConfigComponent(
-        localBaseUrl,
-        { lang$: of('en') } as any,
-        { use: jest.fn() } as any,
-        searchConfigServiceSpy,
-        portalDialogSpy,
-        portalMessageSpy,
-        appStateService,
-        localStore
+      // Construct through the injection context so the field-level `viewChild(Select)` initializer
+      // (valid in production because Angular creates the component in its DI context) works here too.
+      const localComponent = runInInjectionContext(
+        TestBed.inject(Injector),
+        () =>
+          new OneCXSearchConfigComponent(
+            localBaseUrl,
+            { lang$: of('en') } as any,
+            { use: jest.fn() } as any,
+            searchConfigServiceSpy,
+            portalDialogSpy,
+            portalMessageSpy,
+            appStateService,
+            localStore
+          )
       )
 
       tick(100)
@@ -260,65 +315,6 @@ describe('OneCXSearchConfigComponent', () => {
         productName: 'product'
       })
       expect(localComponent).toBeTruthy()
-    }))
-
-    it('should expose create action and overlay text states', () => {
-      component.ocxInitRemoteComponent({
-        appId: 'appId',
-        productName: 'product',
-        permissions: ['SEARCHCONFIG#CREATE'],
-        baseUrl: 'base'
-      } as any)
-
-      expect(component.baseOptions).toEqual([{ id: 'ocx-add-search-config-option' }])
-      expect(
-        component.overlayButtonText({
-          editMode: true,
-          currentConfig: config,
-          searchConfigs: [config]
-        } as any)
-      ).toEqual({
-        key: 'SEARCH_CONFIG.EDITING',
-        params: { config: config.name }
-      })
-      expect(
-        component.overlayButtonText({
-          editMode: false,
-          currentConfig: config,
-          searchConfigs: [config]
-        } as any)
-      ).toEqual({
-        key: 'SEARCH_CONFIG.ACTIVE',
-        params: { config: config.name }
-      })
-      expect(
-        component.overlayButtonText({
-          editMode: false,
-          currentConfig: undefined,
-          searchConfigs: []
-        } as any)
-      ).toEqual({ key: 'SEARCH_CONFIG.MANAGE.LABEL' })
-    })
-
-    it('should not throw when overlay panel is undefined in onSearchConfigSave', fakeAsync(() => {
-      component.op = undefined
-
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
-
-      const vm = {
-        searchConfigs: [],
-        pageName: 'page-name',
-        fieldValues: {},
-        displayedColumnsIds: [],
-        viewMode: basicViewMode,
-        selectedGroupKey: 'default',
-        isColumnGroupComponentActive: true,
-        layout: 'table'
-      } as any
-
-      expect(() => component.onSearchConfigSave(vm)).not.toThrow()
-
-      tick(500)
     }))
 
     it('should set search configs on page info update', fakeAsync(() => {
@@ -357,20 +353,7 @@ describe('OneCXSearchConfigComponent', () => {
     }))
   })
 
-  describe('overlay content', () => {
-    it('should expose only configs with values in the view model', async () => {
-      store.patchState({
-        searchConfigs: [config, onlyValuesConfig, onlyColumnsConfig]
-      })
-
-      const vm = await firstValueFrom(store.searchConfigVm$)
-
-      expect(vm.searchConfigs.map((item) => item.name)).toEqual([config.name, onlyValuesConfig.name])
-      expect(vm.currentConfig).toBeUndefined()
-    })
-  })
-
-  describe('on config save', () => {
+  describe('on config save (Save As)', () => {
     it('should provide explanation for column freeze when column group component is inactive', fakeAsync(() => {
       store.patchState({
         columnGroupComponentActive: false,
@@ -459,7 +442,7 @@ describe('OneCXSearchConfigComponent', () => {
       )
     }))
 
-    it('should not add config and reset if dialog was closed', fakeAsync(() => {
+    it('should not add config when the dialog was closed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
       const setSpy = jest.spyOn(store, 'setCurrentConfig')
@@ -496,12 +479,11 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
 
     it.each([null, { result: undefined, button: 'primary' }])(
-      'should not add config and reset if the dialog state is %o',
+      'should not add config when the dialog state is %o',
       fakeAsync((dialogResult: null | { result: undefined; button: 'primary' }) => {
         const appState = TestBed.inject(AppStateService)
         const addSpy = jest.spyOn(store, 'addSearchConfig')
@@ -539,12 +521,11 @@ describe('OneCXSearchConfigComponent', () => {
         tick(500)
 
         expect(addSpy).toHaveBeenCalledTimes(0)
-        expect(setSpy).toHaveBeenCalledTimes(1)
-        expect(setSpy).toHaveBeenCalledWith(undefined)
+        expect(setSpy).toHaveBeenCalledTimes(0)
       })
     )
 
-    it('should not add config and reset if create was not confirmed', fakeAsync(() => {
+    it('should not add config when create was not confirmed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
       const setSpy = jest.spyOn(store, 'setCurrentConfig')
@@ -588,8 +569,7 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
 
     it('should add and set config if create was confirmed', fakeAsync(() => {
@@ -645,8 +625,7 @@ describe('OneCXSearchConfigComponent', () => {
         summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
       })
       expect(addSpy).toHaveBeenCalledWith(config)
-      expect(setSpy).toHaveBeenCalledTimes(2)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(1)
       expect(setSpy).toHaveBeenCalledWith(config)
     }))
 
@@ -707,6 +686,62 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
+    it('should fall back to an empty name and values when they are missing', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+
+      // fieldValues is left undefined in the store so the `?? {}` fallback is exercised.
+      store.patchState({
+        searchConfigs: [],
+        pageName: 'my_page',
+        displayedColumnsIds: [],
+        viewMode: advancedViewMode,
+        selectedGroupKey: 'default'
+      })
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            saveInputValues: true,
+            saveColumns: false
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onSearchConfigSave({
+        searchConfigs: [],
+        pageName: 'my_page',
+        fieldValues: undefined,
+        displayedColumnsIds: [],
+        viewMode: advancedViewMode,
+        selectedGroupKey: 'default',
+        isColumnGroupComponentActive: true,
+        layout: 'table',
+        currentConfig: undefined,
+        editMode: false,
+        isInChargeOfEdit: false
+      } as any)
+      tick(500)
+
+      expect(createCallSpy).toHaveBeenCalledWith({
+        appId: 'my-app',
+        productName: 'my-product',
+        fieldListVersion: 0,
+        isReadonly: false,
+        page: 'my_page',
+        name: '',
+        isAdvanced: true,
+        columns: [],
+        values: {}
+      })
+    }))
+
     it('should save columns', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
@@ -764,7 +799,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
-    it('should not add config and reset if create call failed', fakeAsync(() => {
+    it('should not add config when the create call failed', fakeAsync(() => {
       const error = new Error('my-error')
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
@@ -815,41 +850,32 @@ describe('OneCXSearchConfigComponent', () => {
       })
       expect(consoleSpy).toHaveBeenCalledWith(error)
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
-    }))
-  })
-
-  describe('on edit actions', () => {
-    it('should set edit mode on edit button click', fakeAsync(() => {
-      const editModeSpy = jest.spyOn(store, 'enterEditMode')
-      store.patchState({
-        searchConfigs: [config]
-      })
-
-      component.onSearchConfigEdit(config)
-      tick(500)
-
-      expect(editModeSpy).toHaveBeenCalledTimes(1)
-      expect(editModeSpy).toHaveBeenCalledWith(config)
-    }))
-
-    it('should cancel edit mode on edit cancel button click', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-      store.patchState({
-        searchConfigs: [config]
-      })
-
-      component.onSearchConfigEdit(config)
-      component.onSearchConfigCancelEdit()
-      tick(500)
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
   })
 
   describe('on delete actions', () => {
-    it('should delete config', fakeAsync(() => {
+    it('should open the reusable delete dialog for the config when invoked', fakeAsync(() => {
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
+      jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
+
+      component.onSearchConfigDelete(config)
+      tick(500)
+
+      // The exact openDialog argument list is asserted once in the helper spec; here only that the
+      // dialog was opened for the right config. `toHaveBeenCalledWith` requires the arity to match
+      // (openDialog takes five args), so the non-config args use lenient matchers: a later change to
+      // the dialog shape (button id/severity/width) is edited in the helper spec, not here.
+      expect(portalDialogSpy.openDialog).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ parameters: { config: config.name } }),
+        expect.anything(),
+        expect.anything(),
+        expect.anything()
+      )
+    }))
+
+    it('should delete the config and show the success toast when the delete is confirmed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -865,13 +891,16 @@ describe('OneCXSearchConfigComponent', () => {
       component.onSearchConfigDelete(config)
       tick(500)
 
-      expect(portalMessageSpy.info).toHaveBeenCalledWith({
-        summaryKey: 'SEARCH_CONFIG.DELETE_SUCCESS'
+      expect(portalMessageSpy.success).toHaveBeenCalledWith({
+        summaryKey: 'SEARCH_CONFIG.DELETE_CONFIRM.SUCCESS',
+        summaryParameters: {
+          config: config.name
+        }
       })
       expect(deleteSpy).toHaveBeenCalledWith(config)
     }))
 
-    it('should not delete config if dialog was closed', fakeAsync(() => {
+    it('should not delete the config when the dialog was closed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -885,7 +914,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(deleteSpy).toHaveBeenCalledTimes(0)
     }))
 
-    it('should not delete config if secondary button was chosen', fakeAsync(() => {
+    it('should not delete the config when the secondary button was chosen', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -903,7 +932,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(deleteSpy).toHaveBeenCalledTimes(0)
     }))
 
-    it('should not delete config if delete call failed', fakeAsync(() => {
+    it('should not delete the config when the delete call failed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       const consoleSpy = jest.spyOn(console, 'error')
       const error = new Error('my-error-msg')
@@ -929,611 +958,6 @@ describe('OneCXSearchConfigComponent', () => {
     }))
   })
 
-  describe('on edit save', () => {
-    const getSaveEditVm = (overrides: Partial<any> = {}) => ({
-      currentConfig: config,
-      isColumnGroupComponentActive: true,
-      layout: 'table',
-      editMode: true,
-      isInChargeOfEdit: false,
-      searchConfigs: [config],
-      pageName: 'page-name',
-      fieldValues: config.values,
-      displayedColumnsIds: config.columns,
-      viewMode: basicViewMode,
-      selectedGroupKey: 'default',
-      ...overrides
-    })
-
-    const triggerSaveEdit = (overrides: Partial<any> = {}) => {
-      component.onSearchConfigEdit(config)
-      component.onSearchConfigSaveEdit(getSaveEditVm(overrides) as any)
-      tick(500)
-    }
-
-    it('should use config info to fill dialog', fakeAsync(() => {
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config
-        } as any)
-      )
-      jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(
-        of({
-          configs: [config],
-          id: config.id
-        } as any)
-      )
-      const dialogServiceSpy = jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit()
-
-      expect(dialogServiceSpy).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: config.name,
-            saveInputValues: true,
-            saveColumns: true,
-            frozeColumnSaveOption: false,
-            frozeColumnSaveOptionExplanation: ''
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-    }))
-
-    it('should use fallback values for dialog inputs', fakeAsync(() => {
-      const dialogSpy = jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
-
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(of({ config: undefined } as any))
-
-      component.onSearchConfigSaveEdit({
-        currentConfig: {
-          id: '1',
-          name: 'cfg',
-          values: undefined,
-          columns: undefined
-        },
-        isColumnGroupComponentActive: true,
-        layout: 'table',
-        searchConfigs: [],
-        pageName: 'page-name',
-        fieldValues: undefined,
-        displayedColumnsIds: [],
-        viewMode: basicViewMode,
-        selectedGroupKey: 'default',
-        editMode: true,
-        isInChargeOfEdit: false
-      } as any)
-
-      tick(500)
-
-      expect(dialogSpy).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        expect.objectContaining({
-          inputs: expect.objectContaining({
-            saveInputValues: false,
-            saveColumns: false
-          })
-        }),
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-    }))
-
-    it('should provide explanation for column freeze when column group component is inactive', fakeAsync(() => {
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: false
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config
-        } as any)
-      )
-      jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(
-        of({
-          configs: [config],
-          id: config.id
-        } as any)
-      )
-      const dialogServiceSpy = jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit({
-        isColumnGroupComponentActive: false
-      })
-
-      expect(dialogServiceSpy).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: config.name,
-            saveInputValues: true,
-            saveColumns: true,
-            frozeColumnSaveOption: true,
-            frozeColumnSaveOptionExplanation: 'SEARCH_CONFIG.COLUMN_GROUP_COMPONENT_INACTIVE'
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-    }))
-
-    it('should provide explanation for column freeze when layout is not table', fakeAsync(() => {
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'list',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config
-        } as any)
-      )
-      jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(
-        of({
-          configs: [config],
-          id: config.id
-        } as any)
-      )
-      const dialogServiceSpy = jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit({
-        layout: 'list'
-      })
-
-      expect(dialogServiceSpy).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: config.name,
-            saveInputValues: true,
-            saveColumns: true,
-            frozeColumnSaveOption: true,
-            frozeColumnSaveOptionExplanation: 'SEARCH_CONFIG.TABLE_VIEW_INACTIVE'
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-    }))
-
-    it('should cancel edit if dialog was closed', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
-
-      triggerSaveEdit()
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
-    }))
-
-    it('should cancel edit if edit was not confirmed', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'secondary'
-        } as any)
-      )
-
-      triggerSaveEdit()
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
-    }))
-
-    it('should save edit config if edit was confirmed', fakeAsync(() => {
-      const saveEditSpy = jest.spyOn(store, 'saveEdit')
-      const updatedConfig = {
-        ...config,
-        name: 'conf-1',
-        values: { k: 'v-2' }
-      }
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(
-        of({
-          configs: [updatedConfig]
-        } as any)
-      )
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit()
-
-      expect(portalMessageSpy.info).toHaveBeenCalledWith({
-        summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_SUCCESS'
-      })
-      expect(saveEditSpy).toHaveBeenCalledWith(updatedConfig)
-    }))
-
-    it('should save inputs and viewMode', fakeAsync(() => {
-      const updateSpy = jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(of(undefined as any))
-      const initState = {
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      }
-      store.patchState(initState as any)
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          result: {
-            searchConfigName: 'new-name',
-            saveInputValues: true
-          },
-          button: 'primary'
-        } as any)
-      )
-
-      store.patchState({
-        ...initState,
-        fieldValues: { k: 'v_2' },
-        viewMode: advancedViewMode
-      } as any)
-
-      triggerSaveEdit({
-        fieldValues: { k: 'v_2' },
-        viewMode: advancedViewMode
-      })
-
-      expect(updateSpy).toHaveBeenCalledWith('1', {
-        searchConfig: {
-          ...config,
-          name: 'new-name',
-          columns: [],
-          values: { k: 'v_2' },
-          isAdvanced: true
-        }
-      })
-    }))
-
-    it('should save columns', fakeAsync(() => {
-      const updateSpy = jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(of(undefined as any))
-      const initState = {
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      }
-      store.patchState(initState as any)
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          result: {
-            searchConfigName: 'new-name',
-            saveColumns: true
-          },
-          button: 'primary'
-        } as any)
-      )
-
-      store.patchState({
-        ...initState,
-        displayedColumnsIds: ['col-2']
-      } as any)
-
-      triggerSaveEdit({
-        displayedColumnsIds: ['col-2']
-      })
-
-      expect(updateSpy).toHaveBeenCalledWith('1', {
-        searchConfig: {
-          ...config,
-          name: 'new-name',
-          columns: ['col-2'],
-          values: {},
-          isAdvanced: false
-        }
-      })
-    }))
-
-    it('should cancel edit if get search config call failed', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-      const error = new Error('my-msg')
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(throwError(() => error))
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit()
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
-    }))
-
-    it('should cancel edit if update search config call failed', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-      store.patchState({
-        searchConfigs: [config],
-        layout: 'table',
-        columnGroupComponentActive: true
-      })
-      const error = new Error('my-msg')
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(
-        of({
-          config: config
-        } as any)
-      )
-      jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(throwError(() => error))
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
-        of({
-          button: 'primary'
-        } as any)
-      )
-
-      triggerSaveEdit()
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
-    }))
-
-    it('should cancel edit if config is not set', fakeAsync(() => {
-      const cancelEditSpy = jest.spyOn(store, 'cancelEdit')
-
-      component.onSearchConfigSaveEdit({
-        currentConfig: undefined
-      } as any)
-
-      tick(500)
-
-      expect(cancelEditSpy).toHaveBeenCalledTimes(1)
-    }))
-
-    it('should handle optional hide and undefined subscriptions without throwing', fakeAsync(() => {
-      component.op = undefined
-      component.currentConfigSub = undefined
-      component.dataRevertSub = undefined
-      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of({ button: 'primary' } as any))
-      jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
-
-      expect(() => component.onSearchConfigChange({ id: 'x', name: 'y' } as any)).not.toThrow()
-      expect(() => component.onSearchConfigEdit({ id: 'x', name: 'y' } as any)).not.toThrow()
-      expect(() => component.onSearchConfigDelete({ id: 'x', name: 'y' } as any)).not.toThrow()
-      expect(() => component.ngOnDestroy()).not.toThrow()
-      tick(0)
-    }))
-
-    it('should build empty edit/create payload branches when optional fields are undefined', () => {
-      const createSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
-
-      component['saveSearchConfig'](
-        {
-          searchConfigName: undefined,
-          saveInputValues: false,
-          saveColumns: false
-        } as any,
-        { appId: 'app-id', productName: 'prod' } as any,
-        { fieldValues: undefined, displayedColumnsIds: undefined, viewMode: basicViewMode } as any,
-        'dashboard'
-      ).subscribe()
-
-      expect(createSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: '',
-          columns: [],
-          values: {},
-          isAdvanced: false
-        })
-      )
-
-      const updateSpy = jest.spyOn(searchConfigServiceSpy, 'updateSearchConfig').mockReturnValue(of({} as any))
-
-      component['editSearchConfig'](
-        { id: 'id-1', name: 'cfg', columns: ['col-1'], values: {}, isAdvanced: false } as any,
-        {
-          searchConfigName: undefined,
-          saveInputValues: false,
-          saveColumns: false
-        } as any,
-        { fieldValues: undefined, displayedColumnsIds: ['c1'], viewMode: basicViewMode } as any,
-        { isColumnGroupComponentActive: true, layout: 'table' } as any
-      ).subscribe()
-
-      expect(updateSpy).toHaveBeenCalledWith(
-        'id-1',
-        expect.objectContaining({
-          searchConfig: expect.objectContaining({
-            name: 'cfg',
-            columns: [],
-            values: {},
-            isAdvanced: false
-          })
-        })
-      )
-
-      updateSpy.mockClear()
-
-      component['editSearchConfig'](
-        {
-          id: 'id-2',
-          name: undefined,
-          columns: ['col-1'],
-          values: {},
-          isAdvanced: false
-        } as any,
-        undefined,
-        {
-          fieldValues: undefined,
-          displayedColumnsIds: ['c1'],
-          viewMode: basicViewMode
-        } as any,
-        {
-          isColumnGroupComponentActive: true
-        } as any
-      ).subscribe()
-
-      expect(updateSpy).toHaveBeenCalledWith(
-        'id-2',
-        expect.objectContaining({
-          searchConfig: expect.objectContaining({
-            name: ''
-          })
-        })
-      )
-
-      updateSpy.mockClear()
-
-      component['editSearchConfig'](
-        {
-          id: 'id-3',
-          name: 'cfg',
-          columns: ['col-1'],
-          values: {},
-          isAdvanced: false
-        } as any,
-        {
-          saveInputValues: true,
-          saveColumns: false
-        } as any,
-        {
-          fieldValues: undefined,
-          displayedColumnsIds: ['c1'],
-          viewMode: basicViewMode
-        } as any,
-        {
-          isColumnGroupComponentActive: false,
-          layout: 'grid'
-        } as any
-      ).subscribe()
-
-      expect(updateSpy).toHaveBeenCalledWith(
-        'id-3',
-        expect.objectContaining({
-          searchConfig: expect.objectContaining({
-            values: {}
-          })
-        })
-      )
-    })
-
-    it('should use empty object when fieldValues are undefined and saveInputValues is true', () => {
-      const createSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
-
-      component['saveSearchConfig'](
-        {
-          searchConfigName: 'new-name',
-          saveInputValues: true,
-          saveColumns: false
-        } as any,
-        {
-          appId: 'app-id',
-          productName: 'product'
-        } as any,
-        {
-          fieldValues: undefined,
-          displayedColumnsIds: [],
-          viewMode: basicViewMode
-        } as any,
-        'page-name'
-      ).subscribe()
-
-      expect(createSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'new-name',
-          values: {},
-          columns: [],
-          isAdvanced: false
-        })
-      )
-    })
-
-    it('should use false values for empty config', fakeAsync(() => {
-      const openDialogSpy = jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
-
-      jest.spyOn(searchConfigServiceSpy, 'getSearchConfig').mockReturnValue(of({ config: undefined } as any))
-
-      component.onSearchConfigSaveEdit({
-        currentConfig: {
-          id: '1',
-          name: 'empty-config',
-          values: undefined,
-          columns: undefined
-        },
-        isColumnGroupComponentActive: true,
-        layout: 'table'
-      } as any)
-
-      tick(500)
-
-      expect(openDialogSpy).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.EDIT_HEADER',
-        expect.objectContaining({
-          inputs: expect.objectContaining({
-            searchConfigName: 'empty-config',
-            saveInputValues: false,
-            saveColumns: false
-          })
-        }),
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-    }))
-  })
-
   describe('on dataToRevert change', () => {
     it('should not emit if data does not contain viewMode', fakeAsync(() => {
       const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
@@ -1552,6 +976,32 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(emitterSpy).toHaveBeenCalledTimes(0)
+    }))
+
+    it('should emit the reverted data with an undefined name when field values and view mode are present', fakeAsync(() => {
+      const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
+
+      store.patchState({
+        dataToRevert: {
+          fieldValues: {
+            k: 'v'
+          },
+          viewMode: basicViewMode,
+          displayedColumnsIds: ['col-1'],
+          columnGroupKey: 'default'
+        }
+      })
+
+      tick(500)
+
+      expect(emitterSpy).toHaveBeenCalledWith({
+        name: undefined,
+        fieldValues: {
+          k: 'v'
+        },
+        displayedColumnsIds: ['col-1'],
+        viewMode: basicViewMode
+      })
     }))
   })
 
@@ -1722,13 +1172,590 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
   })
+})
 
-  describe('focusManageButton', () => {
-    it('should not throw when manage button is undefined', () => {
-      component.manageButton = undefined
+@Component({
+  standalone: true,
+  imports: [OneCXSearchConfigComponent],
+  template: '<app-ocx-search-config></app-ocx-search-config>'
+})
+class HostComponent {}
 
-      expect(() => component.focusManageButton()).not.toThrow()
+describe('OneCXSearchConfigHarness (remote host element)', () => {
+  let hostFixture: ComponentFixture<HostComponent>
+  let childStore: SearchConfigStore
+  let childComponent: OneCXSearchConfigComponent
+
+  const searchConfigServiceSpy = {
+    getSearchConfigInfos: () =>
+      of({
+        configs: []
+      } as any),
+    createSearchConfig: jest.fn(),
+    deleteSearchConfig: jest.fn(),
+    getSearchConfig: jest.fn(),
+    updateSearchConfig: jest.fn(),
+    configuration: new Configuration({
+      basePath: ''
     })
+  } as unknown as SearchConfigAPIService
+
+  let baseUrlSubject: ReplaySubject<any>
+
+  const patchConfigs = async (configs: SearchConfigFixture[]) => {
+    childStore.patchState({
+      searchConfigs: configs
+    })
+    hostFixture.detectChanges()
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+  }
+
+  const openItems = async () => (await harness()).getSelectItems()
+
+  // The combobox is the element PrimeNG keeps focused while the panel is open (`focusInputViewChild`,
+  // `role="combobox"`); the keyboard handler only reacts to a Delete pressed directly on it.
+  const comboboxOf = (select: Select): HTMLElement => {
+    const combobox = select.focusInputViewChild?.nativeElement
+    expect(combobox).toBeTruthy()
+    return combobox as HTMLElement
+  }
+
+  const harness = async () =>
+    (await TestbedHarnessEnvironment.documentRootLoader(hostFixture).getHarness(
+      OneCXSearchConfigHarness
+    )) as OneCXSearchConfigHarness
+
+  // `PortalDialogService`, `SearchConfigAPIService` and `PortalMessageService` are all
+  // `providedIn: 'any'`, so the child would otherwise resolve the real services from the root
+  // injector, not a root TestBed `useValue`. Override the component so the child injects the mocks
+  // through DI (rather than mutating its private fields).
+  const portalDialogHostMock = {
+    openDialog: jest.fn()
+  } as unknown as PortalDialogService
+
+  const portalMessageHostMock = {
+    info: jest.fn(),
+    success: jest.fn(),
+    error: jest.fn()
+  } as unknown as PortalMessageService
+
+  beforeAll(() => {
+    // PrimeNG scrolls the selected select item into view when the panel opens, but jsdom does not
+    // implement `scrollIntoView`. Stub it so opening the panel with a current selection does not throw.
+    Element.prototype.scrollIntoView = () => {}
+  })
+
+  beforeEach(async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReset()
+    baseUrlSubject = new ReplaySubject<any>(1)
+    TestBed.overrideComponent(OneCXSearchConfigComponent, {
+      add: {
+        providers: [
+          { provide: PortalDialogService, useValue: portalDialogHostMock },
+          { provide: SearchConfigAPIService, useValue: searchConfigServiceSpy },
+          { provide: PortalMessageService, useValue: portalMessageHostMock }
+        ]
+      }
+    })
+    await TestBed.configureTestingModule({
+      imports: [HostComponent, NoopAnimationsModule],
+      providers: [
+        ...provideTranslateTestingService({
+          en: require('../../../assets/i18n/en.json'),
+          de: require('../../../assets/i18n/de.json')
+        }),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: REMOTE_COMPONENT_CONFIG,
+          useValue: baseUrlSubject
+        },
+        {
+          provide: SearchConfigStore,
+          useClass: SearchConfigStore
+        },
+        {
+          provide: SEARCH_CONFIG_STORE_NAME,
+          useValue: 'store'
+        },
+        {
+          provide: SEARCH_CONFIG_TOPIC,
+          useValue: new FakeTopic<SearchConfigMessage>()
+        },
+        DialogService,
+        {
+          provide: PortalDialogService,
+          useValue: { openDialog: jest.fn() }
+        },
+        {
+          provide: PortalMessageService,
+          useValue: { info: jest.fn(), success: jest.fn(), error: jest.fn() }
+        },
+        {
+          provide: SearchConfigAPIService,
+          useValue: searchConfigServiceSpy
+        }
+      ]
+    }).compileComponents()
+
+    baseUrlSubject.next('base_url_mock')
+    hostFixture = TestBed.createComponent(HostComponent)
+    const child = hostFixture.debugElement.query(By.directive(OneCXSearchConfigComponent))!
+    childComponent = child.componentInstance
+    // `SEARCHCONFIG#CREATE` so the Save As button (rendered through a `SEARCHCONFIG#CREATE`-gated
+    // `<p-inputgroup-addon>`) is present; the group itself requires `SEARCHCONFIG#VIEW`.
+    childComponent.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#CREATE', 'SEARCHCONFIG#DELETE']
+    hostFixture.detectChanges()
+
+    childStore = TestBed.inject(SearchConfigStore)
+  })
+
+  it('should render the Search Config label and Save As button when configs are available', async () => {
+    await patchConfigs([config])
+
+    const label = hostFixture.nativeElement.querySelector('.sc-search-config-label')
+    expect(label).toBeTruthy()
+    expect(label.textContent.trim()).toBe('Search Config')
+
+    const saveAs = await (await harness()).getSaveAsButton()
+    expect(saveAs).not.toBeNull()
+    expect(await (saveAs as NonNullable<typeof saveAs>).getLabel()).toBe('Save As')
+    // PrimeNG 21 renders p-button[icon] as a signal input (no ng-reflect-icon), so assert the
+    // rendered icon span's classes instead of the harness' getIcon().
+    const iconSpan = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} .p-button-icon`
+    ) as HTMLElement
+    expect(iconSpan).toBeTruthy()
+    expect(iconSpan.classList.contains('pi-save')).toBe(true)
+  })
+
+  it('should expose the config select label to the inner combobox', async () => {
+    await patchConfigs([config])
+
+    // The <label> is wired to the select through [ariaLabelledBy] on the <p-select> host; PrimeNG
+    // forwards that attribute down to its inner role="combobox" element, so the combobox keeps an
+    // accessible name for screen readers.
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox).toBeTruthy()
+    expect(combobox.getAttribute('aria-labelledby')).toBe('sc_search_config_label')
+  })
+
+  it('should expose the keyboard delete hint to the combobox when a deletable option is present', async () => {
+    await patchConfigs([config])
+
+    // The delete-key hint is rendered once (outside the option list, next to the label) and wired to
+    // the inner combobox via `aria-describedby` so screen readers announce the Delete shortcut — the
+    // per-row hint is no longer rendered, so the hint must carry the announcement instead.
+    const hint = hostFixture.nativeElement.querySelector('#sc_search_config_delete_hint') as HTMLElement
+    expect(hint).toBeTruthy()
+    expect(hint.classList.contains('p-hidden-accessible')).toBe(true)
+    expect(hint.textContent.trim()).toBe('Press Delete to remove')
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox).toBeTruthy()
+    expect(combobox.getAttribute('aria-describedby')).toBe('sc_search_config_delete_hint')
+  })
+
+  it('should not render the keyboard delete hint when no option is deletable', async () => {
+    await patchConfigs([readonlyConfig])
+
+    // `config` is the only deletable fixture; a read-only config alone leaves no deletable option, so
+    // the hint is not rendered and the combobox is not wired to it.
+    expect(hostFixture.nativeElement.querySelector('#sc_search_config_delete_hint')).toBeNull()
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('should render the No search configs label and a disabled select when no config is available', async () => {
+    await patchConfigs([])
+
+    const label = hostFixture.nativeElement.querySelector('.sc-search-config-label')
+    expect(label.textContent.trim()).toBe('No search configs')
+
+    // The empty select is disabled; Save As stays enabled.
+    const selectLabel = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]')
+    expect(selectLabel.getAttribute('aria-disabled')).toBe('true')
+
+    const saveAs = await (await harness()).getSaveAsButton()
+    expect(saveAs).not.toBeNull()
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(false)
+  })
+
+  it('should list only the value-storing config names in the select when a criteria-only config is present', async () => {
+    // `onlyColumnsConfig` stores columns only (no values), so it is filtered out of `searchConfigVm$`
+    // and its row must not render — the criteria-only filter is exercised at the DOM level.
+    await patchConfigs([config, onlyValuesConfig, onlyColumnsConfig])
+
+    // Exactly the two value-storing rows render (the criteria-only config is filtered out of the
+    // value-storing rows), identified by their `aria-label` (the config name) via the harness accessor.
+    const h = await harness()
+    expect(await openItems()).toHaveLength(2)
+    expect(await h.findSelectItem('config-1')).not.toBeNull()
+    expect(await h.findSelectItem('config-2')).not.toBeNull()
+    expect(await h.findSelectItem(onlyColumnsConfig.name)).toBeNull()
+  })
+
+  it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
+    await patchConfigs([config])
+
+    const items = await openItems()
+    await hostFixture.whenStable()
+    expect(items.length).toBeGreaterThan(0)
+
+    // The select host carries the styleClass hook.
+    const select = hostFixture.nativeElement.querySelector('p-select') as HTMLElement
+    expect(select.classList.contains('sc-search-config-select')).toBe(true)
+
+    // The opened panel carries the panelStyleClass hook and renders inside `<p-select>` (PrimeNG
+    // default `self`), which is a descendant of the remote element, so it resolves from the remote
+    // element rather than the document body.
+    const panel = hostFixture.nativeElement.querySelector('.sc-search-config-panel') as HTMLElement
+    expect(panel).toBeTruthy()
+  })
+
+  it('should apply the config when its row is clicked', async () => {
+    await patchConfigs([config])
+
+    const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
+    const item = await (await harness()).findSelectItem('config-1')
+    expect(item).not.toBeNull()
+    await (item as NonNullable<typeof item>).selectItem()
+    await hostFixture.whenStable()
+
+    expect(changeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: config.id, name: config.name }))
+  })
+
+  it('should open the delete dialog when the trash button is clicked, without selecting the row', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config])
+    const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
+    const trashButton = await (await harness()).getDeleteButton(config.name)
+    expect(trashButton).toBeTruthy()
+
+    await (trashButton as NonNullable<typeof trashButton>).click()
+    await hostFixture.whenStable()
+
+    // The exact openDialog argument list is asserted once in the helper spec; here only that the
+    // dialog was opened for the right config. `toHaveBeenCalledWith` requires the arity to match
+    // (openDialog takes five args), so the non-config args use lenient matchers.
+    expect(portalDialogHostMock.openDialog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ parameters: { config: config.name } }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    )
+    // The trash click stops propagation, so the row is not selected.
+    expect(changeSpy).not.toHaveBeenCalled()
+  })
+
+  it('should render no trash button when the SEARCHCONFIG#DELETE permission is missing', async () => {
+    childComponent.permissions = ['SEARCHCONFIG#VIEW']
+    await patchConfigs([config])
+
+    const h = await harness()
+    expect(await h.getRowByName(config.name)).toBeTruthy()
+    expect(await h.getDeleteButton(config.name)).toBeNull()
+  })
+
+  it('should keep the Save As button enabled and open the save dialog when clicked', async () => {
+    await patchConfigs([config])
+
+    const saveAs = await (await harness()).getSaveAsButton()
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(false)
+
+    const saveSpy = jest.spyOn(childComponent, 'onSearchConfigSave').mockImplementation(() => {})
+    await (saveAs as NonNullable<typeof saveAs>).click()
+
+    expect(saveSpy).toHaveBeenCalled()
+  })
+
+  it('should disable the config select when the column remote is in edit mode', async () => {
+    await patchConfigs([config])
+    childStore.patchState({
+      editMode: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The `[disabled]` guard (`vm.searchConfigs.length === 0 || vm.editMode`) forces the select closed
+    // while another remote holds the edit lock, so a picked row can no longer desync from the applied
+    // `currentConfig` (which `setCurrentConfig` ignores in edit mode).
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]')
+    expect(combobox.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('should disable the Save As button when the column remote is in edit mode', async () => {
+    await patchConfigs([config])
+    childStore.patchState({
+      editMode: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(true)
+  })
+
+  it('should delete the focused option when Delete is pressed on the open select combobox', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    // Open the panel (through the harness) and drive the real DOM keydown path end-to-end: a real
+    // ArrowDown focuses the (single) option, then Delete deletes it.
+    const configSelect = await (await harness()).getConfigSelect()
+    await configSelect?.open()
+    await hostFixture.whenStable()
+    expect(select.overlayVisible).toBe(true)
+    expect(select.focusedOptionIndex()).toBe(-1)
+
+    // With no option focused yet (`focusedOptionIndex()` is `-1`), a Delete on the combobox must not
+    // delete — this is the `focusedIndex < 0` guard in `onSearchConfigSelectKeydown`.
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    const deleteEvent = new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true })
+    combobox.dispatchEvent(deleteEvent)
+    await hostFixture.whenStable()
+    expect(deleteSpy).toHaveBeenCalledWith(config)
+    // The handler calls `preventDefault()` so the browser's default Delete is not also consumed.
+    expect(deleteEvent.defaultPrevented).toBe(true)
+  })
+
+  it('should ignore a non-Delete key on the open select combobox', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    // Focus the option so only the `event.code !== 'Delete'` guard can keep Delete from firing.
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    // A focused, deletable option plus an Enter key must not open the delete dialog (the `event.code !== 'Delete'` guard).
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when the Delete key is pressed inside the filter input', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    // Open the panel and focus an option. With `[filter]="true"`, PrimeNG focuses the filter input,
+    // and its keydown bubbles up to the `p-select` host, so a real Delete on the filter input must not
+    // trigger the delete shortcut (the `event.target !== focusInputViewChild` guard).
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBe(0)
+
+    const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLElement
+    expect(filterInput).toBeTruthy()
+    filterInput.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when the focused option is read-only or out of range', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    await patchConfigs([config, readonlyConfig])
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    const select = (childComponent as any).select() as Select
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const combobox = comboboxOf(select)
+    const visibleOptions = select.visibleOptions()
+
+    // Focused on the read-only option: `canDelete` is false, so a real Delete is a no-op.
+    const readonlyIndex = visibleOptions.findIndex((option: any) => option.id === readonlyConfig.id)
+    expect(readonlyIndex).toBeGreaterThanOrEqual(0)
+    select.focusedOptionIndex.set(readonlyIndex)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    // Focused out of range: `visibleOptions()[index]` is undefined, so a real Delete is a no-op.
+    select.focusedOptionIndex.set(visibleOptions.length)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should show the full config name with a tooltip that appears on ellipsis', async () => {
+    await patchConfigs([config])
+
+    // The row name renders the full config name and carries the `pTooltip` directive wired to the same
+    // name with `showOnEllipsis`. The tooltip container only mounts once shown (and does not reliably
+    // render in jsdom), so assert on the rendered full-name text and the directive instance's options.
+    const h = await harness()
+    expect(await h.getRowByName(config.name)).toBeTruthy()
+    // A single config is patched, so there is exactly one row name span.
+    const nameSpan = hostFixture.nativeElement.querySelector('.sc-search-config-row-name') as HTMLElement
+    expect(nameSpan).toBeTruthy()
+    expect(nameSpan.textContent.trim()).toBe(config.name)
+
+    const tooltip = hostFixture.debugElement.query(By.css(`.sc-search-config-row-name`)).injector.get(Tooltip)
+    expect(tooltip).toBeTruthy()
+    expect(tooltip.getOption('showOnEllipsis')).toBe(true)
+    expect(tooltip.getOption('tooltipLabel')).toBe(config.name)
+  })
+
+  it('should clear the select and emit the cleared selection when the selected config is deleted', async () => {
+    await patchConfigs([config, onlyValuesConfig])
+
+    // Seed the displayed data (the page's own values and columns) and the displayed data: the
+    // `searchConfigSelected` emission is driven by `currentConfig$` combined (via `withLatestFrom`)
+    // with `currentDisplayedData$`, which is filtered until `displayedSearchData` exists.
+    const pageFieldValues = { my_k: 'my_v' }
+    const pageDisplayedColumnsIds = ['my_col']
+    childStore.patchState({
+      fieldValues: pageFieldValues,
+      displayedColumnsIds: pageDisplayedColumnsIds,
+      displayedSearchData: {
+        fieldValues: pageFieldValues,
+        displayedColumnsIds: pageDisplayedColumnsIds,
+        viewMode: basicViewMode
+      }
+    })
+
+    // Select config-1 through the store (rather than the panel) so the panel is opened exactly once,
+    // by the trash-button lookup below.
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const select = (childComponent as any).select() as Select
+    expect(select.label()).toBe(config.name)
+
+    // Delete the selected config through the (mocked) confirm dialog.
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of({ button: 'primary' } as any))
+    ;(searchConfigServiceSpy.deleteSearchConfig as jest.Mock).mockReturnValue(of({} as any))
+    const searchConfigSelectedSpy = jest.spyOn(childComponent.searchConfigSelected, 'emit')
+    const trashButton = await (await harness()).getDeleteButton(config.name)
+    await (trashButton as NonNullable<typeof trashButton>).click()
+    await hostFixture.whenStable()
+    // `store.deleteSearchConfig` runs in a `setTimeout` and `currentConfig$` is debounced (50ms).
+    await delay(120)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The deleted config was the current one, so the select no longer shows a value and the applied
+    // selection resets (the page's own values/columns are untouched — the store just clears the current
+    // config, which surfaces as a cleared `searchConfigSelected`).
+    expect(select.label()).toBe('p-emptylabel')
+    expect(searchConfigSelectedSpy).toHaveBeenCalledWith(undefined)
+    // Deleting the config must not touch the page's own values and columns.
+    const state = childStore.state()
+    expect(state.fieldValues).toEqual(pageFieldValues)
+    expect(state.displayedColumnsIds).toEqual(pageDisplayedColumnsIds)
+  })
+
+  it('should show the filter placeholder and the no-match text for a non-matching filter', async () => {
+    await patchConfigs([config, onlyValuesConfig])
+
+    // Open the panel so the in-panel filter input is rendered.
+    await openItems()
+    await hostFixture.whenStable()
+
+    const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLInputElement
+    expect(filterInput).toBeTruthy()
+    expect(filterInput.placeholder).toBe('Filter by name')
+
+    filterInput.value = 'does-not-exist'
+    filterInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await delay(150)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const emptyMessage = hostFixture.nativeElement.querySelector('.p-select-empty-message')
+    expect(emptyMessage).toBeTruthy()
+    expect(emptyMessage!.textContent.trim()).toBe('No matching configs')
+  })
+
+  it('should render the trash button inside a deletable row and none inside a read-only row', async () => {
+    await patchConfigs([config, readonlyConfig])
+
+    // The panel renders one row per option; the read-only config's row renders no trash button.
+    const h = await harness()
+    expect(await h.getDeleteButton(config.name)).toBeTruthy()
+    expect(await h.getDeleteButton(readonlyConfig.name)).toBeNull()
+  })
+
+  it('should reject getRowByName when no row matches the given name', async () => {
+    // A criteria-only config (no values) is patched but filtered out of the value-storing rows, so the
+    // panel renders no row for it and `getRowByName` rejects.
+    await patchConfigs([config, onlyColumnsConfig])
+
+    const h = await harness()
+    await expect(h.getRowByName(onlyColumnsConfig.name)).rejects.toThrow(
+      `No search-config row found for name "${onlyColumnsConfig.name}"`
+    )
+  })
+
+  it('should hide the Save As button but still render the select without the SEARCHCONFIG#CREATE permission', async () => {
+    // The Save As addon is gated by `SEARCHCONFIG#CREATE`; with only `SEARCHCONFIG#VIEW` the group and
+    // select render but the addon (and the button inside it) do not.
+    childComponent.permissions = ['SEARCHCONFIG#VIEW']
+    await patchConfigs([config])
+
+    const h = await harness()
+    expect(await h.getSaveAsButton()).toBeNull()
+    expect(hostFixture.nativeElement.querySelector('.sc-search-config-save-as')).toBeNull()
+
+    // The select itself is still present and usable.
+    expect(await h.getConfigSelect()).not.toBeNull()
+    expect(hostFixture.nativeElement.querySelector('.sc-search-config-select')).not.toBeNull()
+  })
+
+  it('should render nothing when the SEARCHCONFIG#VIEW permission is missing', async () => {
+    // The remote is gated by `*ocxIfPermission="'SEARCHCONFIG#VIEW'"`, so with no permissions the whole
+    // control (the `p-inputgroup` and the `p-select` inside it) is absent.
+    childComponent.permissions = []
+    await patchConfigs([config])
+
+    expect(hostFixture.nativeElement.querySelector('p-inputgroup')).toBeNull()
+
+    // With no `p-select` rendered, the harness' `getConfigSelect()` is `null` and `getSelectItems()`
+    // falls back to an empty list rather than throwing.
+    const h = await harness()
+    expect(await h.getConfigSelect()).toBeNull()
+    expect(await h.getSelectItems()).toEqual([])
   })
 })
 
