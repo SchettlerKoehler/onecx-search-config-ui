@@ -7,9 +7,9 @@ import { PortalMessageService } from '@onecx/angular-integration-interface'
 import { SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
 import { SEARCH_CONFIG_DELETE_BUTTON_ID, SEARCH_CONFIG_DIALOG_WIDTH } from './constants'
 
-// TODO(#960): The `SEARCH_CONFIG.DELETE_DIALOG.{HEADER,MESSAGE,CONFIRM}` and `SEARCH_CONFIG.DELETE_SUCCESS`
-// i18n keys are legacy, kept only for the column remote until it reuses this helper and switches to the
-// `DELETE_CONFIRM.*` keys. Remove them (and the column remote's inline dialog) in #960.
+// The `SEARCH_CONFIG.DELETE_DIALOG.{HEADER,MESSAGE,CONFIRM}` and `SEARCH_CONFIG.DELETE_SUCCESS` i18n keys are
+// legacy, kept only for the column remote until it reuses this helper and switches to the `DELETE_CONFIRM.*`
+// keys; they are removed (along with the column remote's inline dialog) together with that migration (#960).
 
 /**
  * Opens the reusable delete-confirm dialog and deletes the config when it is confirmed.
@@ -49,7 +49,7 @@ export function confirmAndDeleteSearchConfig(
     )
     .pipe(
       mergeMap((dialogResult) => {
-        if (!dialogResult || dialogResult.button !== 'primary') {
+        if (dialogResult?.button !== 'primary') {
           return of(false)
         }
         return searchConfigService.deleteSearchConfig(config.id).pipe(

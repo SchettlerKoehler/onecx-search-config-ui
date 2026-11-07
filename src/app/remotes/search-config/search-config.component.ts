@@ -314,7 +314,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   // is a no-op here (`showClear` is not set) and does not stop the event, so this fires after it.
   onSearchConfigSelectKeydown(event: KeyboardEvent): void {
     const select = this.select()
-    if (event.code !== 'Delete' || !select || !select.overlayVisible) {
+    if (event.code !== 'Delete' || !select?.overlayVisible) {
       return
     }
     // Ignore the bubbled Delete of elements inside the overlay (notably the filter input) — the shortcut

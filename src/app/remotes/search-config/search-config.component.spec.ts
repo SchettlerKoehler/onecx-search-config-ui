@@ -1394,7 +1394,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // Exactly the two value-storing rows render (the criteria-only config is filtered out of the
     // value-storing rows), identified by their `aria-label` (the config name) via the harness accessor.
     const h = await harness()
-    expect((await openItems()).length).toBe(2)
+    expect(await openItems()).toHaveLength(2)
     expect(await h.findSelectItem('config-1')).not.toBeNull()
     expect(await h.findSelectItem('config-2')).not.toBeNull()
     expect(await h.findSelectItem(onlyColumnsConfig.name)).toBeNull()
