@@ -72,7 +72,8 @@ ocx-search-config-component {
     .sc-search-config-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      /* Spacing between the config name and its delete affordance. PrimeNG select-list gap token. */
+      gap: var(--p-select-list-gap);
       width: 100%;
     }
 
