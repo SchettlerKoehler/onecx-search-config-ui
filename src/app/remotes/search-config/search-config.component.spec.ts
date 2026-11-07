@@ -31,7 +31,7 @@ import {
   provideRemoteComponentsServiceMock,
   provideShellCapabilityServiceMock
 } from '@onecx/angular-integration-interface/mocks'
-import { ListItemHarness, PSelectHarness, provideTranslateTestingService } from '@onecx/angular-testing'
+import { provideTranslateTestingService } from '@onecx/angular-testing'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 import { getWindowState } from '@onecx/angular-webcomponents'
 
@@ -137,6 +137,20 @@ describe('OneCXSearchConfigComponent', () => {
   let baseUrlSubject: ReplaySubject<any>
   beforeEach(() => {
     baseUrlSubject = new ReplaySubject<any>(1)
+    // `PortalDialogService`, `PortalMessageService` and `SearchConfigAPIService` are all
+    // `providedIn: 'any'`, so the component's constructor injection resolves to a view-scoped
+    // instance that does not see a root TestBed `useValue`. Override the component so the component
+    // injects the spies through DI (rather than mutating its private fields), matching the
+    // host-element suite below.
+    TestBed.overrideComponent(OneCXSearchConfigComponent, {
+      add: {
+        providers: [
+          { provide: PortalDialogService, useValue: portalDialogSpy },
+          { provide: PortalMessageService, useValue: portalMessageSpy },
+          { provide: SearchConfigAPIService, useValue: searchConfigServiceSpy }
+        ]
+      }
+    })
     TestBed.configureTestingModule({
       declarations: [],
       imports: [OneCXSearchConfigComponent, NoopAnimationsModule],
@@ -163,19 +177,7 @@ describe('OneCXSearchConfigComponent', () => {
           provide: SEARCH_CONFIG_TOPIC,
           useValue: new FakeTopic<SearchConfigMessage>()
         },
-        DialogService,
-        {
-          provide: PortalDialogService,
-          useValue: portalDialogSpy
-        },
-        {
-          provide: PortalMessageService,
-          useValue: portalMessageSpy
-        },
-        {
-          provide: SearchConfigAPIService,
-          useValue: searchConfigServiceSpy
-        }
+        DialogService
       ]
     }).compileComponents()
 
@@ -196,15 +198,6 @@ describe('OneCXSearchConfigComponent', () => {
     // Grant the permissions before the first change detection so the header renders.
     component.permissions = ['SEARCHCONFIG#VIEW', 'SEARCHCONFIG#DELETE']
     fixture.detectChanges()
-
-    // `PortalDialogService`, `SearchConfigAPIService` and `PortalMessageService` are all
-    // `providedIn: 'any'`, so the component's constructor injection resolves to a view-scoped
-    // instance that does not see the root TestBed `useValue` mocks above. Assigning the spies to the
-    // (private) fields is the load-bearing way to make the component exercise the mocks; dropping
-    // this line makes the component use the real services and the Save As / delete tests fail.
-    ;(component as any).portalDialogService = portalDialogSpy
-    ;(component as any).portalMessageService = portalMessageSpy
-    ;(component as any).searchConfigService = searchConfigServiceSpy as any
 
     store = TestBed.inject(SearchConfigStore)
   })
@@ -1219,23 +1212,6 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
   }
 
-  // The panel renders inside the <p-select> host (PrimeNG's default `self` appendTo), so it stays
-  // scoped to this remote; tooltips append to `body` (forced). #getSelectItems resolves against the
-  // document root and works; pick the wanted row from the returned list.
-  //
-  // Rows are matched by their `<li>` `aria-label`, not their text: PrimeNG sets `aria-label` to the
-  // option label (the config name), while a deletable row's `<li>` text is polluted by the screen-reader
-  // keyboard-shortcut hint, so `getText()` is not a stable identity.
-  const itemAriaLabel = (item: ListItemHarness) => item.host().then((host) => host.getAttribute('aria-label'))
-  const findItemByAriaLabel = async (items: Awaited<ReturnType<PSelectHarness['getSelectItems']>>, name: string) => {
-    for (const item of items) {
-      if ((await itemAriaLabel(item)) === name) {
-        return item
-      }
-    }
-    return null
-  }
-
   const openItems = async () => (await harness()).getSelectItems()
 
   // The combobox is the element PrimeNG keeps focused while the panel is open (`focusInputViewChild`,
@@ -1366,6 +1342,32 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(combobox.getAttribute('aria-labelledby')).toBe('sc_search_config_label')
   })
 
+  it('should expose the keyboard delete hint to the combobox when a deletable option is present', async () => {
+    await patchConfigs([config])
+
+    // The delete-key hint is rendered once (outside the option list, next to the label) and wired to
+    // the inner combobox via `aria-describedby` so screen readers announce the Delete shortcut — the
+    // per-row hint is no longer rendered, so the hint must carry the announcement instead.
+    const hint = hostFixture.nativeElement.querySelector('#sc_search_config_delete_hint') as HTMLElement
+    expect(hint).toBeTruthy()
+    expect(hint.classList.contains('p-hidden-accessible')).toBe(true)
+    expect(hint.textContent.trim()).toBe('Press Delete to remove')
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox).toBeTruthy()
+    expect(combobox.getAttribute('aria-describedby')).toBe('sc_search_config_delete_hint')
+  })
+
+  it('should not render the keyboard delete hint when no option is deletable', async () => {
+    await patchConfigs([readonlyConfig])
+
+    // `config` is the only deletable fixture; a read-only config alone leaves no deletable option, so
+    // the hint is not rendered and the combobox is not wired to it.
+    expect(hostFixture.nativeElement.querySelector('#sc_search_config_delete_hint')).toBeNull()
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox.getAttribute('aria-describedby')).toBeNull()
+  })
+
   it('should render the No search configs label and a disabled select when no config is available', async () => {
     await patchConfigs([])
 
@@ -1389,9 +1391,13 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // and its row must not render — the criteria-only filter is exercised at the DOM level.
     await patchConfigs([config, onlyValuesConfig, onlyColumnsConfig])
 
-    const items = await openItems()
-    const names = await Promise.all(items.map((item) => itemAriaLabel(item)))
-    expect(names).toEqual(['config-1', 'config-2'])
+    // Exactly the two value-storing rows render (the criteria-only config is filtered out of the
+    // value-storing rows), identified by their `aria-label` (the config name) via the harness accessor.
+    const h = await harness()
+    expect((await openItems()).length).toBe(2)
+    expect(await h.findSelectItem('config-1')).not.toBeNull()
+    expect(await h.findSelectItem('config-2')).not.toBeNull()
+    expect(await h.findSelectItem(onlyColumnsConfig.name)).toBeNull()
   })
 
   it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
@@ -1416,8 +1422,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await patchConfigs([config])
 
     const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
-    const items = await openItems()
-    const item = await findItemByAriaLabel(items, 'config-1')
+    const item = await (await harness()).findSelectItem('config-1')
     expect(item).not.toBeNull()
     await (item as NonNullable<typeof item>).selectItem()
     await hostFixture.whenStable()
@@ -1521,6 +1526,12 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
     expect(select.overlayVisible).toBe(true)
     expect(select.focusedOptionIndex()).toBe(-1)
+
+    // With no option focused yet (`focusedOptionIndex()` is `-1`), a Delete on the combobox must not
+    // delete — this is the `focusedIndex < 0` guard in `onSearchConfigSelectKeydown`.
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
 
     combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
     await hostFixture.whenStable()
@@ -1715,6 +1726,21 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await expect(h.getRowByName(onlyColumnsConfig.name)).rejects.toThrow(
       `No search-config row found for name "${onlyColumnsConfig.name}"`
     )
+  })
+
+  it('should hide the Save As button but still render the select without the SEARCHCONFIG#CREATE permission', async () => {
+    // The Save As addon is gated by `SEARCHCONFIG#CREATE`; with only `SEARCHCONFIG#VIEW` the group and
+    // select render but the addon (and the button inside it) do not.
+    childComponent.permissions = ['SEARCHCONFIG#VIEW']
+    await patchConfigs([config])
+
+    const h = await harness()
+    expect(await h.getSaveAsButton()).toBeNull()
+    expect(hostFixture.nativeElement.querySelector('.sc-search-config-save-as')).toBeNull()
+
+    // The select itself is still present and usable.
+    expect(await h.getConfigSelect()).not.toBeNull()
+    expect(hostFixture.nativeElement.querySelector('.sc-search-config-select')).not.toBeNull()
   })
 
   it('should render nothing when the SEARCHCONFIG#VIEW permission is missing', async () => {

@@ -26,6 +26,9 @@ describe('createRemoteProviders', () => {
       provideShellCapabilityServiceMock()
     ].flat()
 
+    // This test boots a full application (`createApplication`) rather than a TestBed component, so it
+    // carries a 20s timeout to cover the boot.
+    //
     // `AngularAcceleratorModule` does not provide `DialogService`/`PortalDialogService`, so the remotes
     // rely on `providePortalDialogService()` in `createRemoteProviders` for the confirm dialog. The
     // accelerator's own APP_INITIALIZER awaits `firstValueFrom(userService.lang$.pipe(skip(1)))`, so the

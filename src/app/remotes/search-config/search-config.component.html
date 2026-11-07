@@ -21,6 +21,11 @@
           [disabled]="vm.searchConfigs.length === 0 || vm.editMode"
           (keydown)="onSearchConfigSelectKeydown($event)"
           [ariaLabelledBy]="'sc_search_config_label'"
+          [pt]="
+            hasDeletableConfig(vm.searchConfigs)
+              ? { label: { 'aria-describedby': 'sc_search_config_delete_hint' } }
+              : undefined
+          "
         >
           <ng-template #item let-config>
             <div class="sc-search-config-row">
@@ -28,7 +33,6 @@
                 config.name
               }}</span>
               @if (canDelete(config)) {
-                <span class="sr-only">{{ 'SEARCH_CONFIG.DELETE.DELETE_KEY_HINT' | translate }}</span>
                 <p-button
                   class="sc-search-config-delete"
                   [icon]="deleteIcon"
@@ -48,6 +52,11 @@
               | translate
           }}
         </label>
+        @if (hasDeletableConfig(vm.searchConfigs)) {
+          <span id="sc_search_config_delete_hint" class="p-hidden-accessible">
+            {{ 'SEARCH_CONFIG.DELETE.DELETE_KEY_HINT' | translate }}
+          </span>
+        }
       </p-floatlabel>
       <p-inputgroup-addon
         class="sc-search-config-save-as"

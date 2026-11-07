@@ -15,7 +15,8 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
 
   private readonly _select = this.locatorForOptional(PSelectHarness)
   private readonly _saveAsButton = this.locatorForOptional(PButtonHarness.with({ id: SEARCH_CONFIG_SAVE_AS_BUTTON_ID }))
-  // The trash button is the only `p-button` inside the panel, so it resolves from the document root.
+  // The trash button is the only `.sc-search-config-delete` button in the panel. `locatorForAll` on this
+  // `ContentContainerComponentHarness` resolves it from the harness host element, not the document root.
   private readonly _deleteButtons = this.locatorForAll(PButtonHarness.with({ selector: '.sc-search-config-delete' }))
 
   async getConfigSelect() {
@@ -34,6 +35,23 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
   async getSelectItems(): Promise<ListItemHarness[]> {
     const select = await this.getConfigSelect()
     return (await select?.getSelectItems()) ?? []
+  }
+
+  /**
+   * The opened panel row whose `aria-label` equals the given config name, or `null` when no such row
+   * renders. The panel is opened first. Rows are matched by `aria-label` (PrimeNG sets it to the option
+   * label — the config name) rather than by `getText()`, which on a deletable row is polluted by the
+   * screen-reader keyboard-shortcut hint.
+   */
+  async findSelectItem(name: string): Promise<ListItemHarness | null> {
+    const items = await this.getSelectItems()
+    for (const item of items) {
+      const ariaLabel = await (await item.host()).getAttribute('aria-label')
+      if (ariaLabel === name) {
+        return item
+      }
+    }
+    return null
   }
 
   /**

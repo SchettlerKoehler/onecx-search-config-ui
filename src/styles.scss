@@ -101,25 +101,15 @@ ocx-search-config-component {
 
   /* The joined Save As button is wrapped in a `p-inputgroupaddon`: PrimeNG zeroes the inner button's
    * corners and the group's `--p-inputgroup-addon-border-radius` token (set on `.sc-search-config-group`)
-   * rounds the addon's outer (end) corners, joining it to the select's start corners. */
+   * rounds the addon's outer (end) corners, joining it to the select's start corners. The addon's
+   * default form-field border (top/bottom and the trailing edge) is retinted to the primary button's
+   * border color so it blends into the blue Save As button instead of drawing a grey hairline. */
   .sc-search-config-save-as {
     height: var(--onecx-search-config-height);
+    --p-inputgroup-addon-border-color: var(--p-button-primary-border-color);
 
     .p-button {
       height: 100%;
     }
-  }
-
-  /* Screen-reader-only hint (the delete-key affordance announced to assistive technology). */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
   }
 }

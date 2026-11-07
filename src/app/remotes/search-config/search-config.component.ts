@@ -21,6 +21,7 @@ import { PrimeIcons } from 'primeng/api'
 import { Select, SelectModule } from 'primeng/select'
 import { FloatLabelModule } from 'primeng/floatlabel'
 import { InputGroupModule } from 'primeng/inputgroup'
+import { InputGroupAddonModule } from 'primeng/inputgroupaddon'
 import { TooltipModule } from 'primeng/tooltip'
 
 import { AngularAcceleratorModule, SearchConfigData, PortalDialogService } from '@onecx/angular-accelerator'
@@ -75,6 +76,7 @@ import { environment } from 'src/environments/environment'
     SelectModule,
     FloatLabelModule,
     InputGroupModule,
+    InputGroupAddonModule,
     TooltipModule
   ]
 })
@@ -279,6 +281,12 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   // read-only flag. Read-only or un-privileged rows render no trash button.
   canDelete(searchConfig: SearchConfigInfo) {
     return this.permissions.includes('SEARCHCONFIG#DELETE') && !searchConfig.isReadonly
+  }
+
+  // Whether at least one listed option is deletable; the screen-reader delete-key hint is rendered
+  // (and wired to the combobox via `aria-describedby`) only when there is a deletable option.
+  hasDeletableConfig(searchConfigs: SearchConfigInfo[]) {
+    return searchConfigs.some((searchConfig) => this.canDelete(searchConfig))
   }
 
   onSearchConfigDelete(searchConfig: SearchConfigInfo) {
