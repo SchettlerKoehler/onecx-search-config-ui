@@ -15,32 +15,30 @@
           [filterPlaceholder]="'SEARCH_CONFIG.SELECT.FILTER_PLACEHOLDER' | translate"
           [emptyFilterMessage]="'SEARCH_CONFIG.SELECT.NO_MATCH' | translate"
           [panelStyleClass]="'sc-search-config-panel'"
-          [appendTo]="overlayAppendTo"
+          scrollHeight="var(--onecx-search-config-panel-max-height)"
+          inputId="sc_search_config_select"
           [disabled]="vm.searchConfigs.length === 0"
           [ariaLabel]="'SEARCH_CONFIG.SELECT.ARIA_LABEL' | translate"
         >
           <ng-template #item let-config>
             <div class="sc-search-config-row">
-              <span
-                class="sc-search-config-row-name"
-                [pTooltip]="config.name"
-                [showOnEllipsis]="true"
-                [appendTo]="overlayAppendTo"
-                >{{ config.name }}</span
-              >
+              <span class="sc-search-config-row-name" [pTooltip]="config.name" [showOnEllipsis]="true">{{
+                config.name
+              }}</span>
               @if (canDelete(config)) {
                 <p-button
                   class="sc-search-config-delete"
                   icon="{{ deleteIcon }}"
                   [text]="true"
-                  [ariaLabel]="'SEARCH_CONFIG.DELETE.ARIA_LABEL' | translate"
+                  severity="danger"
+                  [ariaLabel]="'SEARCH_CONFIG.DELETE.ARIA_LABEL_NAMED' | translate: { config: config.name }"
                   (click)="onSearchConfigDelete(config); $event.stopPropagation()"
                 ></p-button>
               }
             </div>
           </ng-template>
         </p-select>
-        <label class="sc-search-config-label">
+        <label class="sc-search-config-label" for="sc_search_config_select">
           {{
             (vm.searchConfigs.length === 0 ? 'SEARCH_CONFIG.SELECT.NO_CONFIGS_LABEL' : 'SEARCH_CONFIG.SELECT.LABEL')
               | translate
@@ -48,7 +46,7 @@
         </label>
       </p-floatlabel>
       <p-button
-        id="sc_search_config_save_as"
+        [id]="saveAsButtonId"
         class="sc-search-config-save-as"
         [label]="'SEARCH_CONFIG.SAVE_AS.LABEL' | translate"
         [icon]="saveAsIcon"

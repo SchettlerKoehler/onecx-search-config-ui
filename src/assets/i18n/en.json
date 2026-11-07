@@ -8,9 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "EDITING": "Editing: {{config}}",
-    "ACTIVE": "Active: {{config}}",
-    "SEARCH_CONFIG_LIST": "Search configs",
     "SAVE_EDIT": {
       "LABEL": "Save",
       "ARIA_LABEL": "Save search config",
@@ -24,7 +21,6 @@
     "SELECT": {
       "LABEL": "Search Config",
       "ARIA_LABEL": "Select search config",
-      "TOOLTIP": "Select search config",
       "NO_CONFIGS_LABEL": "No search configs",
       "FILTER_PLACEHOLDER": "Filter by name",
       "NO_MATCH": "No matching configs"
@@ -33,21 +29,13 @@
       "LABEL": "Save As",
       "ARIA_LABEL": "Save as new search config"
     },
-    "MANAGE": {
-      "LABEL": "Manage search configs",
-      "ARIA_LABEL": "Manage search configs",
-      "TOOLTIP": "Manage search configs"
-    },
-    "ADD": {
-      "ARIA_LABEL": "Add search config",
-      "TOOLTIP": "Add search config"
-    },
     "EDIT": {
       "ARIA_LABEL": "Edit search config",
       "TOOLTIP": "Edit search config"
     },
     "DELETE": {
       "ARIA_LABEL": "Delete search config",
+      "ARIA_LABEL_NAMED": "Delete search config {{config}}",
       "TOOLTIP": "Delete search config"
     },
     "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",

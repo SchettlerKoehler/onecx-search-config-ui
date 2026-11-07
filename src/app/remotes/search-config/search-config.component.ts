@@ -1,5 +1,5 @@
 import { AsyncPipe, Location } from '@angular/common'
-import { Component, ElementRef, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy } from '@angular/core'
+import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import {
@@ -54,7 +54,8 @@ import {
   advancedViewModeType,
   basicViewMode,
   basicViewModeType,
-  SEARCH_CONFIG_DELETE_BUTTON_ID
+  SEARCH_CONFIG_DELETE_BUTTON_ID,
+  SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
 import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
 import { environment } from 'src/environments/environment'
@@ -106,6 +107,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   saveAsIcon = PrimeIcons.SAVE
   deleteIcon = PrimeIcons.TRASH
   deleteButtonId = SEARCH_CONFIG_DELETE_BUTTON_ID
+  saveAsButtonId = SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 
   permissions: string[] = []
 
@@ -118,8 +120,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
     private readonly portalDialogService: PortalDialogService,
     private readonly portalMessageService: PortalMessageService,
     private readonly appStateService: AppStateService,
-    private readonly searchConfigStore: SearchConfigStore,
-    private readonly hostElement: ElementRef<HTMLElement>
+    private readonly searchConfigStore: SearchConfigStore
   ) {
     this.userService.lang$.subscribe((lang) => {
       this.translateService.use(lang)
@@ -203,11 +204,6 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
     this.permissions = config.permissions
   }
 
-  /** Overlay target: the panel renders inside this remote's element wherever the library allows. */
-  get overlayAppendTo() {
-    return this.hostElement.nativeElement
-  }
-
   onSearchConfigChange(value: SearchConfigInfo) {
     setTimeout(() => {
       this.searchConfigStore.setCurrentConfig(value)
@@ -215,9 +211,9 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
 
   onSearchConfigSave(vm: SearchConfigViewModel) {
-    setTimeout(() => {
-      this.searchConfigStore.setCurrentConfig(undefined)
-    })
+    // The selection is not cleared up front: a successful create selects the new config (see the
+    // dialog subscription below), while a cancelled or failed create leaves the current selection
+    // intact in the select.
 
     let frozeColumnSaveOptionExplanation = ''
 

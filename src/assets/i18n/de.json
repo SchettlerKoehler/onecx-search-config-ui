@@ -8,8 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "EDITING": "{{config}} Suchkonfiguration bearbeiten",
-    "ACTIVE": "Aktiv: {{config}}",
     "SAVE_EDIT": {
       "LABEL": "Speichern",
       "ARIA_LABEL": "Suchkonfiguration speichern",
@@ -23,7 +21,6 @@
     "SELECT": {
       "LABEL": "Suchkonfiguration",
       "ARIA_LABEL": "Suchkonfiguration auswählen",
-      "TOOLTIP": "Suchkonfiguration auswählen",
       "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
       "FILTER_PLACEHOLDER": "Nach Name filtern",
       "NO_MATCH": "Keine passenden Suchkonfigurationen"
@@ -32,21 +29,13 @@
       "LABEL": "Speichern unter",
       "ARIA_LABEL": "Als neue Suchkonfiguration speichern"
     },
-    "MANAGE": {
-      "LABEL": "Suchkonfigurationen verwalten",
-      "ARIA_LABEL": "Suchkonfigurationen verwalten",
-      "TOOLTIP": "Suchkonfigurationen verwalten"
-    },
-    "ADD": {
-      "ARIA_LABEL": "Suchkonfiguration hinzufügen",
-      "TOOLTIP": "Suchkonfiguration hinzufügen"
-    },
     "EDIT": {
       "ARIA_LABEL": "Suchkonfiguration bearbeiten",
       "TOOLTIP": "Suchkonfiguration bearbeiten"
     },
     "DELETE": {
       "ARIA_LABEL": "Suchkonfiguration löschen",
+      "ARIA_LABEL_NAMED": "Suchkonfiguration {{config}} löschen",
       "TOOLTIP": "Suchkonfiguration löschen"
     },
     "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",

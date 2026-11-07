@@ -235,11 +235,6 @@ describe('OneCXSearchConfigComponent', () => {
     expect(() => component.ngOnDestroy()).not.toThrow()
   })
 
-  it('should target overlays to the remote host element', () => {
-    const hostElement = (component as any).hostElement
-    expect(component.overlayAppendTo).toBe(hostElement.nativeElement)
-  })
-
   describe('setup', () => {
     it('should init remote component', (done) => {
       const config: RemoteComponentConfig = {
@@ -300,8 +295,7 @@ describe('OneCXSearchConfigComponent', () => {
         portalDialogSpy,
         portalMessageSpy,
         appStateService,
-        localStore,
-        { nativeElement: document.createElement('div') } as any
+        localStore
       )
 
       tick(100)
@@ -489,8 +483,7 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
 
     it.each([null, { result: undefined, button: 'primary' }])(
@@ -532,8 +525,7 @@ describe('OneCXSearchConfigComponent', () => {
         tick(500)
 
         expect(addSpy).toHaveBeenCalledTimes(0)
-        expect(setSpy).toHaveBeenCalledTimes(1)
-        expect(setSpy).toHaveBeenCalledWith(undefined)
+        expect(setSpy).toHaveBeenCalledTimes(0)
       })
     )
 
@@ -581,8 +573,7 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
 
     it('should add and set config if create was confirmed', fakeAsync(() => {
@@ -638,8 +629,7 @@ describe('OneCXSearchConfigComponent', () => {
         summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
       })
       expect(addSpy).toHaveBeenCalledWith(config)
-      expect(setSpy).toHaveBeenCalledTimes(2)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(1)
       expect(setSpy).toHaveBeenCalledWith(config)
     }))
 
@@ -864,8 +854,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
       expect(consoleSpy).toHaveBeenCalledWith(error)
       expect(addSpy).toHaveBeenCalledTimes(0)
-      expect(setSpy).toHaveBeenCalledTimes(1)
-      expect(setSpy).toHaveBeenCalledWith(undefined)
+      expect(setSpy).toHaveBeenCalledTimes(0)
     }))
   })
 
@@ -1231,9 +1220,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
   }
 
-  // The panel is appended to the remote host element (external appendTo), so PSelectHarness#getSelectItem,
-  // which resolves against the <p-select> host, cannot see it. #getSelectItems resolves against the
-  // document root and therefore works; pick the wanted row from the returned list.
+  // The panel renders inside the <p-select> host (PrimeNG's in-remote overlayAppendTo default), so it
+  // stays scoped to this remote. #getSelectItems resolves against the document root and works; pick the
+  // wanted row from the returned list.
   const findItemByText = async (items: Awaited<ReturnType<PSelectHarness['getSelectItems']>>, text: string) => {
     for (const item of items) {
       if ((await item.getText()) === text) {
@@ -1337,6 +1326,10 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
 
     const saveAs = await (await harness()).getSaveAsButton()
     expect(saveAs).not.toBeNull()
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(false)
   })
 
   it('should list the criteria-storing config names in the select', async () => {
@@ -1394,6 +1387,95 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
 
     expect(changeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: config.id, name: config.name }))
+  })
+
+  it('should open the delete dialog when the trash button is clicked, without selecting the row', async () => {
+    // The child component resolves `PortalDialogService` from its own module tree
+    // (via `AngularAcceleratorModule`), not from the root TestBed's `useValue` mock, so
+    // swap in a mock on the child instance directly to intercept the call.
+    const portalDialogMock = { openDialog: jest.fn().mockReturnValue(of(undefined as any)) }
+    ;(childComponent as unknown as { portalDialogService: unknown }).portalDialogService = portalDialogMock
+
+    await patchConfigs([config])
+    const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
+    await listItems()
+    await hostFixture.whenStable()
+
+    const rows = Array.from(hostFixture.nativeElement.querySelectorAll('.sc-search-config-row')) as HTMLElement[]
+    const row = rows.find((r) => r.textContent?.includes(config.name))!
+    const trashButton = row.querySelector('.sc-search-config-delete button.p-button') as HTMLButtonElement
+    expect(trashButton).toBeTruthy()
+
+    trashButton.click()
+    await hostFixture.whenStable()
+
+    expect(portalDialogMock.openDialog).toHaveBeenCalledWith(
+      'SEARCH_CONFIG.DELETE_DIALOG.HEADER_QUESTION',
+      {
+        key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE_MESSAGE',
+        parameters: {
+          config: config.name
+        }
+      },
+      {
+        key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE',
+        id: SEARCH_CONFIG_DELETE_BUTTON_ID,
+        severity: 'danger'
+      },
+      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL'
+    )
+    // The trash click stops propagation, so the row is not selected.
+    expect(changeSpy).not.toHaveBeenCalled()
+  })
+
+  it('should render no trash button when the SEARCHCONFIG#DELETE permission is missing', async () => {
+    childComponent.permissions = ['SEARCHCONFIG#VIEW']
+    await patchConfigs([config])
+
+    await listItems()
+    await hostFixture.whenStable()
+
+    const rows = Array.from(hostFixture.nativeElement.querySelectorAll('.sc-search-config-row')) as HTMLElement[]
+    const row = rows.find((r) => r.textContent?.includes(config.name))!
+    expect(row).toBeTruthy()
+    expect(row.querySelector('.sc-search-config-delete')).toBeFalsy()
+  })
+
+  it('should keep the Save As button enabled and open the save dialog when clicked', async () => {
+    await patchConfigs([config])
+
+    const saveAs = await (await harness()).getSaveAsButton()
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(false)
+
+    const saveSpy = jest.spyOn(childComponent, 'onSearchConfigSave').mockImplementation(() => {})
+    await (saveAs as NonNullable<typeof saveAs>).click()
+
+    expect(saveSpy).toHaveBeenCalled()
+  })
+
+  it('should show the filter placeholder and the no-match text for a non-matching filter', async () => {
+    await patchConfigs([config, onlyValuesConfig])
+
+    // Open the panel so the in-panel filter input is rendered.
+    await listItems()
+    await hostFixture.whenStable()
+
+    const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLInputElement
+    expect(filterInput).toBeTruthy()
+    expect(filterInput.placeholder).toBe('Filter by name')
+
+    filterInput.value = 'does-not-exist'
+    filterInput.dispatchEvent(new Event('input', { bubbles: true }))
+    await delay(150)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const emptyMessage = hostFixture.nativeElement.querySelector('.p-select-empty-message')
+    expect(emptyMessage).toBeTruthy()
+    expect(emptyMessage!.textContent.trim()).toBe('No matching configs')
   })
 
   it('should render the trash button inside a deletable row and none inside a read-only row', async () => {
