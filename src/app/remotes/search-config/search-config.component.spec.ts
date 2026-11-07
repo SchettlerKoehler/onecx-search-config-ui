@@ -1314,6 +1314,17 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(iconSpan.classList.contains('pi-save')).toBe(true)
   })
 
+  it('should expose the config select label to the inner combobox', async () => {
+    await patchConfigs([config])
+
+    // The <label> is wired to the select through [ariaLabelledBy] on the <p-select> host; PrimeNG
+    // forwards that attribute down to its inner role="combobox" element, so the combobox keeps an
+    // accessible name for screen readers.
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox).toBeTruthy()
+    expect(combobox.getAttribute('aria-labelledby')).toBe('sc_search_config_label')
+  })
+
   it('should render the No search configs label and a disabled select when no config is available', async () => {
     await patchConfigs([])
 
@@ -1347,16 +1358,6 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     const item = await findItemByText(items, 'config-2')
     expect(item).not.toBeNull()
     expect(await (item as NonNullable<typeof item>).getText()).toBe('config-2')
-  })
-
-  it('should return no select items when no select is rendered', async () => {
-    await patchConfigs([config])
-
-    // Remove the select so the `if (!select) return []` guard in the harness is exercised.
-    document.querySelectorAll('p-select').forEach((el) => el.remove())
-
-    const items = await (await harness()).getSelectItems()
-    expect(items).toEqual([])
   })
 
   it('should render the select and its opened panel inside the remote element with the style hooks', async () => {

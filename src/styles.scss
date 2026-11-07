@@ -15,7 +15,7 @@
  * Search-config design tokens.
  *
  * Every value is a PrimeNG design token or another --onecx-search-config-* variable. No
- * hard-coded colors or sizes are used (the three fixed rem dimensions below are the app-owned
+ * hard-coded colors or sizes are used (the four fixed rem dimensions below are the app-owned
  * layout decisions for which PrimeNG provides no token). Later tickets must keep this rule:
  * PrimeNG tokens or --onecx-search-config-* only, defined here in styles.scss.
  */
@@ -38,7 +38,7 @@
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
   /* Color of a config option-group header in the list (used by a later ticket). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
-  /* Width of the reusable delete-confirm dialog (applied by the host via data-style-id). */
+  /* Width of the reusable delete-confirm dialog (reserved for #962; not applied yet). */
   --onecx-search-config-dialog-width: 30rem;
 }
 
