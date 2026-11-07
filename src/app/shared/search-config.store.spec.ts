@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing'
-import { take } from 'rxjs'
+import { firstValueFrom, take } from 'rxjs'
+import { DialogService } from 'primeng/dynamicdialog'
 
 import { FakeTopic } from '@onecx/accelerator'
 
+import { createRemoteProviders } from './remote.providers'
 import {
   SearchConfigMessage,
   SearchConfigState,
@@ -72,6 +74,33 @@ describe('SearchConfigStore', () => {
     store = new SearchConfigStore('store-1', mockSearchConfigStoreTopic as any as SearchConfigTopic)
 
     secondStore = new SearchConfigStore('store-2', mockSearchConfigStoreTopic as any as SearchConfigTopic)
+  })
+
+  describe('remote providers', () => {
+    it('should provide the PortalDialogService so the remotes can open dialogs', () => {
+      // `AngularAcceleratorModule` does not provide `DialogService`/`PortalDialogService`, so the
+      // remotes rely on `providePortalDialogService()` in `createRemoteProviders` for the confirm dialog.
+      // `providePortalDialogService()` itself returns a nested provider array, so flatten the result
+      // before looking for the token.
+      const providers = createRemoteProviders('store', undefined)
+      const flatProviders = providers.flat(Infinity) as unknown[]
+
+      expect(flatProviders).toContain(DialogService)
+    })
+  })
+
+  describe('searchConfigVm$ selector', () => {
+    it('should expose only configs with values and no current config in the view model', async () => {
+      store.patchState({
+        searchConfigs: [testConfigBase, testConfigOnlyValues, testConfigOnlyColumns],
+        currentSearchConfig: undefined
+      })
+
+      const vm = await firstValueFrom(store.searchConfigVm$)
+
+      expect(vm.searchConfigs.map((item) => item.name)).toEqual([testConfigBase.name, testConfigOnlyValues.name])
+      expect(vm.currentConfig).toBeUndefined()
+    })
   })
 
   describe('activate store', () => {

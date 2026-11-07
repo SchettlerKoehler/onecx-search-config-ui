@@ -57,13 +57,15 @@
       "HEADER": "Delete search config",
       "MESSAGE": "Are you sure you want to delete search config {{config}}",
       "CONFIRM": "Confirm",
-      "CANCEL": "Cancel",
-      "HEADER_QUESTION": "Delete search config?",
-      "DELETE_MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
-      "DELETE": "Delete"
+      "CANCEL": "Cancel"
+    },
+    "DELETE_CONFIRM": {
+      "HEADER": "Delete search config?",
+      "MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
+      "DELETE": "Delete",
+      "SUCCESS": "Search config '{{config}}' deleted."
     },
     "DELETE_SUCCESS": "Successfully deleted search config",
-    "DELETE_CONFIG_SUCCESS": "Search config '{{config}}' deleted.",
     "DELETE_FAILURE": "Failed to delete search config",
     "FETCH_FAILURE": "Failed to load search config"
   },

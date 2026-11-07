@@ -2,11 +2,21 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
 import { By, createApplication } from '@angular/platform-browser'
-import { Component, EnvironmentProviders, NgZone, Provider, ɵNoopNgZone as NoopNgZone } from '@angular/core'
+import {
+  Component,
+  EnvironmentProviders,
+  Injector,
+  NgZone,
+  Provider,
+  runInInjectionContext,
+  ɵNoopNgZone as NoopNgZone
+} from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
-import { ReplaySubject, firstValueFrom, of, throwError } from 'rxjs'
+import { ReplaySubject, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
+import { Select } from 'primeng/select'
+import { Tooltip } from 'primeng/tooltip'
 
 import { FakeTopic } from '@onecx/accelerator'
 import { PortalDialogService } from '@onecx/angular-accelerator'
@@ -40,6 +50,7 @@ import {
   SEARCH_CONFIG_DELETE_BUTTON_ID,
   SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
+import { SEARCH_CONFIG_DIALOG_WIDTH } from 'src/app/shared/search-config-delete'
 import { OneCXSearchConfigComponent } from './search-config.component'
 import { OneCXSearchConfigHarness } from './search-config.harness'
 import { searchConfigProviders } from './search-config.component.providers'
@@ -287,15 +298,21 @@ describe('OneCXSearchConfigComponent', () => {
         }
       } as any
 
-      const localComponent = new OneCXSearchConfigComponent(
-        localBaseUrl,
-        { lang$: of('en') } as any,
-        { use: jest.fn() } as any,
-        searchConfigServiceSpy,
-        portalDialogSpy,
-        portalMessageSpy,
-        appStateService,
-        localStore
+      // Construct through the injection context so the field-level `viewChild(Select)` initializer
+      // (valid in production because Angular creates the component in its DI context) works here too.
+      const localComponent = runInInjectionContext(
+        TestBed.inject(Injector),
+        () =>
+          new OneCXSearchConfigComponent(
+            localBaseUrl,
+            { lang$: of('en') } as any,
+            { use: jest.fn() } as any,
+            searchConfigServiceSpy,
+            portalDialogSpy,
+            portalMessageSpy,
+            appStateService,
+            localStore
+          )
       )
 
       tick(100)
@@ -342,19 +359,6 @@ describe('OneCXSearchConfigComponent', () => {
 
       expect(setSearchConfigsSpy).toHaveBeenCalledWith(configs)
     }))
-  })
-
-  describe('select options', () => {
-    it('should expose only configs with values in the view model', async () => {
-      store.patchState({
-        searchConfigs: [config, onlyValuesConfig, onlyColumnsConfig]
-      })
-
-      const vm = await firstValueFrom(store.searchConfigVm$)
-
-      expect(vm.searchConfigs.map((item) => item.name)).toEqual([config.name, onlyValuesConfig.name])
-      expect(vm.currentConfig).toBeUndefined()
-    })
   })
 
   describe('on config save (Save As)', () => {
@@ -446,7 +450,7 @@ describe('OneCXSearchConfigComponent', () => {
       )
     }))
 
-    it('should not add config and reset if dialog was closed', fakeAsync(() => {
+    it('should not add config when the dialog was closed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
       const setSpy = jest.spyOn(store, 'setCurrentConfig')
@@ -487,7 +491,7 @@ describe('OneCXSearchConfigComponent', () => {
     }))
 
     it.each([null, { result: undefined, button: 'primary' }])(
-      'should not add config and reset if the dialog state is %o',
+      'should not add config when the dialog state is %o',
       fakeAsync((dialogResult: null | { result: undefined; button: 'primary' }) => {
         const appState = TestBed.inject(AppStateService)
         const addSpy = jest.spyOn(store, 'addSearchConfig')
@@ -529,7 +533,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     )
 
-    it('should not add config and reset if create was not confirmed', fakeAsync(() => {
+    it('should not add config when create was not confirmed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
       const setSpy = jest.spyOn(store, 'setCurrentConfig')
@@ -803,7 +807,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
-    it('should not add config and reset if create call failed', fakeAsync(() => {
+    it('should not add config when the create call failed', fakeAsync(() => {
       const error = new Error('my-error')
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
@@ -859,7 +863,7 @@ describe('OneCXSearchConfigComponent', () => {
   })
 
   describe('on delete actions', () => {
-    it('should open the reusable delete dialog with the fixed Delete id and danger severity', fakeAsync(() => {
+    it('should open the reusable delete dialog with the fixed Delete id, danger severity and dialog width when invoked', fakeAsync(() => {
       jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of(undefined as any))
       jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
 
@@ -867,23 +871,24 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(portalDialogSpy.openDialog).toHaveBeenCalledWith(
-        'SEARCH_CONFIG.DELETE_DIALOG.HEADER_QUESTION',
+        'SEARCH_CONFIG.DELETE_CONFIRM.HEADER',
         {
-          key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE_MESSAGE',
+          key: 'SEARCH_CONFIG.DELETE_CONFIRM.MESSAGE',
           parameters: {
             config: config.name
           }
         },
         {
-          key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE',
+          key: 'SEARCH_CONFIG.DELETE_CONFIRM.DELETE',
           id: SEARCH_CONFIG_DELETE_BUTTON_ID,
           severity: 'danger'
         },
-        'SEARCH_CONFIG.DELETE_DIALOG.CANCEL'
+        'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
+        { width: SEARCH_CONFIG_DIALOG_WIDTH }
       )
     }))
 
-    it('should delete config and show the success toast', fakeAsync(() => {
+    it('should delete the config and show the success toast when the delete is confirmed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -900,7 +905,7 @@ describe('OneCXSearchConfigComponent', () => {
       tick(500)
 
       expect(portalMessageSpy.success).toHaveBeenCalledWith({
-        summaryKey: 'SEARCH_CONFIG.DELETE_CONFIG_SUCCESS',
+        summaryKey: 'SEARCH_CONFIG.DELETE_CONFIRM.SUCCESS',
         summaryParameters: {
           config: config.name
         }
@@ -908,7 +913,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(deleteSpy).toHaveBeenCalledWith(config)
     }))
 
-    it('should not delete config if dialog was closed', fakeAsync(() => {
+    it('should not delete the config when the dialog was closed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -922,7 +927,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(deleteSpy).toHaveBeenCalledTimes(0)
     }))
 
-    it('should not delete config if secondary button was chosen', fakeAsync(() => {
+    it('should not delete the config when the secondary button was chosen', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       store.patchState({
         searchConfigs: [config]
@@ -940,7 +945,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(deleteSpy).toHaveBeenCalledTimes(0)
     }))
 
-    it('should not delete config if delete call failed', fakeAsync(() => {
+    it('should not delete the config when the delete call failed', fakeAsync(() => {
       const deleteSpy = jest.spyOn(store, 'deleteSearchConfig')
       const consoleSpy = jest.spyOn(console, 'error')
       const error = new Error('my-error-msg')
@@ -1232,18 +1237,45 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     return null
   }
 
-  const listItems = async () => {
-    const select = await (await harness()).getConfigSelect()
-    return await (select as NonNullable<typeof select>).getSelectItems()
-  }
+  const openItems = async () => (await harness()).getSelectItems()
 
   const harness = async () =>
     (await TestbedHarnessEnvironment.documentRootLoader(hostFixture).getHarness(
       OneCXSearchConfigHarness
     )) as OneCXSearchConfigHarness
 
+  // `PortalDialogService`, `SearchConfigAPIService` and `PortalMessageService` are all
+  // `providedIn: 'any'`, so the child would otherwise resolve the real services from the root
+  // injector, not a root TestBed `useValue`. Override the component so the child injects the mocks
+  // through DI (rather than mutating its private fields).
+  const portalDialogHostMock = {
+    openDialog: jest.fn()
+  } as unknown as PortalDialogService
+
+  const portalMessageHostMock = {
+    info: jest.fn(),
+    success: jest.fn(),
+    error: jest.fn()
+  } as unknown as PortalMessageService
+
+  beforeAll(() => {
+    // PrimeNG scrolls the selected select item into view when the panel opens, but jsdom does not
+    // implement `scrollIntoView`. Stub it so opening the panel with a current selection does not throw.
+    Element.prototype.scrollIntoView = () => {}
+  })
+
   beforeEach(async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReset()
     baseUrlSubject = new ReplaySubject<any>(1)
+    TestBed.overrideComponent(OneCXSearchConfigComponent, {
+      add: {
+        providers: [
+          { provide: PortalDialogService, useValue: portalDialogHostMock },
+          { provide: SearchConfigAPIService, useValue: searchConfigServiceSpy },
+          { provide: PortalMessageService, useValue: portalMessageHostMock }
+        ]
+      }
+    })
     await TestBed.configureTestingModule({
       imports: [HostComponent, NoopAnimationsModule],
       providers: [
@@ -1343,27 +1375,20 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(saveAsButton.disabled).toBe(false)
   })
 
-  it('should list the criteria-storing config names in the select', async () => {
-    await patchConfigs([config, onlyValuesConfig])
+  it('should list only the value-storing config names in the select when a criteria-only config is present', async () => {
+    // `onlyColumnsConfig` stores columns only (no values), so it is filtered out of `searchConfigVm$`
+    // and its row must not render — the criteria-only filter is exercised at the DOM level.
+    await patchConfigs([config, onlyValuesConfig, onlyColumnsConfig])
 
-    const items = await listItems()
+    const items = await openItems()
     const texts = await Promise.all(items.map((item) => item.getText()))
     expect(texts).toEqual(['config-1', 'config-2'])
-  })
-
-  it('should resolve a single select item through the harness', async () => {
-    await patchConfigs([config, onlyValuesConfig])
-
-    const items = await listItems()
-    const item = await findItemByText(items, 'config-2')
-    expect(item).not.toBeNull()
-    expect(await (item as NonNullable<typeof item>).getText()).toBe('config-2')
   })
 
   it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
     await patchConfigs([config])
 
-    const items = await listItems()
+    const items = await openItems()
     await hostFixture.whenStable()
     expect(items.length).toBeGreaterThan(0)
 
@@ -1382,7 +1407,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await patchConfigs([config])
 
     const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
-    const items = await listItems()
+    const items = await openItems()
     const item = await findItemByText(items, 'config-1')
     expect(item).not.toBeNull()
     await (item as NonNullable<typeof item>).selectItem()
@@ -1392,39 +1417,31 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
   })
 
   it('should open the delete dialog when the trash button is clicked, without selecting the row', async () => {
-    // The child component resolves `PortalDialogService` from its own module tree
-    // (via `AngularAcceleratorModule`), not from the root TestBed's `useValue` mock, so
-    // swap in a mock on the child instance directly to intercept the call.
-    const portalDialogMock = { openDialog: jest.fn().mockReturnValue(of(undefined as any)) }
-    ;(childComponent as unknown as { portalDialogService: unknown }).portalDialogService = portalDialogMock
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
 
     await patchConfigs([config])
     const changeSpy = jest.spyOn(childComponent, 'onSearchConfigChange')
-    await listItems()
-    await hostFixture.whenStable()
-
-    const rows = Array.from(hostFixture.nativeElement.querySelectorAll('.sc-search-config-row')) as HTMLElement[]
-    const row = rows.find((r) => r.textContent?.includes(config.name))!
-    const trashButton = row.querySelector('.sc-search-config-delete button.p-button') as HTMLButtonElement
+    const trashButton = await (await harness()).getDeleteButton(config.name)
     expect(trashButton).toBeTruthy()
 
-    trashButton.click()
+    ;(trashButton as HTMLButtonElement).click()
     await hostFixture.whenStable()
 
-    expect(portalDialogMock.openDialog).toHaveBeenCalledWith(
-      'SEARCH_CONFIG.DELETE_DIALOG.HEADER_QUESTION',
+    expect(portalDialogHostMock.openDialog).toHaveBeenCalledWith(
+      'SEARCH_CONFIG.DELETE_CONFIRM.HEADER',
       {
-        key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE_MESSAGE',
+        key: 'SEARCH_CONFIG.DELETE_CONFIRM.MESSAGE',
         parameters: {
           config: config.name
         }
       },
       {
-        key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE',
+        key: 'SEARCH_CONFIG.DELETE_CONFIRM.DELETE',
         id: SEARCH_CONFIG_DELETE_BUTTON_ID,
         severity: 'danger'
       },
-      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL'
+      'SEARCH_CONFIG.DELETE_DIALOG.CANCEL',
+      { width: SEARCH_CONFIG_DIALOG_WIDTH }
     )
     // The trash click stops propagation, so the row is not selected.
     expect(changeSpy).not.toHaveBeenCalled()
@@ -1434,11 +1451,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     childComponent.permissions = ['SEARCHCONFIG#VIEW']
     await patchConfigs([config])
 
-    await listItems()
-    await hostFixture.whenStable()
-
-    const rows = Array.from(hostFixture.nativeElement.querySelectorAll('.sc-search-config-row')) as HTMLElement[]
-    const row = rows.find((r) => r.textContent?.includes(config.name))!
+    const row = await (await harness()).getRowByName(config.name)
     expect(row).toBeTruthy()
     expect(row.querySelector('.sc-search-config-delete')).toBeFalsy()
   })
@@ -1458,11 +1471,170 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(saveSpy).toHaveBeenCalled()
   })
 
+  it('should disable the config select when the column remote is in edit mode', async () => {
+    await patchConfigs([config])
+    childStore.patchState({
+      editMode: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The `[disabled]` guard (`vm.searchConfigs.length === 0 || vm.editMode`) forces the select closed
+    // while another remote holds the edit lock, so a picked row can no longer desync from the applied
+    // `currentConfig` (which `setCurrentConfig` ignores in edit mode).
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]')
+    expect(combobox.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  it('should disable the Save As button when the column remote is in edit mode', async () => {
+    await patchConfigs([config])
+    childStore.patchState({
+      editMode: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(true)
+  })
+
+  it('should delete the focused option when Delete is pressed on an open select', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+
+    const select = (childComponent as any).select() as Select
+    expect(select).toBeTruthy()
+
+    // Guard branches (exercised by calling the handler directly so PrimeNG's own keydown side
+    // effects — e.g. Escape closing the panel — do not interfere):
+    // a non-Delete key is ignored regardless of panel state...
+    childComponent.onSearchConfigSelectKeydown({ code: 'Escape' } as KeyboardEvent)
+    expect(deleteSpy).not.toHaveBeenCalled()
+    // ...and Delete while the panel is closed is a no-op. (PrimeNG leaves `overlayVisible`
+    // undefined until the panel is shown, which the handler treats as closed.)
+    expect(select.overlayVisible).toBeFalsy()
+    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    // Open the panel (through the harness) and exercise the real DOM keydown path end-to-end.
+    const configSelect = await (await harness()).getConfigSelect()
+    await configSelect?.open()
+    await hostFixture.whenStable()
+    expect(select.overlayVisible).toBe(true)
+    // No option is focused yet (default focusedOptionIndex is -1), so Delete is ignored.
+    expect(select.focusedOptionIndex()).toBe(-1)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    // Focus the (single) option and press Delete again: the keyboard path deletes it.
+    select.focusedOptionIndex.set(0)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).toHaveBeenCalledWith(config)
+  })
+
+  it('should not delete via the keyboard path when the focused option is not deletable or is out of range', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config, readonlyConfig])
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    const select = (childComponent as any).select() as Select
+    expect(select.overlayVisible).toBe(true)
+
+    const deleteSpy = jest.spyOn(childComponent, 'onSearchConfigDelete').mockImplementation(() => {})
+    const visibleOptions = select.visibleOptions()
+
+    // Focused on the read-only option: `canDelete` is false, so Delete is a no-op.
+    const readonlyIndex = visibleOptions.findIndex((option: any) => option.id === readonlyConfig.id)
+    expect(readonlyIndex).toBeGreaterThanOrEqual(0)
+    select.focusedOptionIndex.set(readonlyIndex)
+    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    // Focused out of range: `visibleOptions()[index]` is undefined, so Delete is a no-op.
+    select.focusedOptionIndex.set(visibleOptions.length)
+    childComponent.onSearchConfigSelectKeydown({ code: 'Delete' } as KeyboardEvent)
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should show the full config name with a tooltip that appears on ellipsis', async () => {
+    await patchConfigs([config])
+
+    // The row name renders the full config name and carries the `pTooltip` directive wired to the same
+    // name with `showOnEllipsis`. The tooltip container only mounts once shown (and does not reliably
+    // render in jsdom), so assert on the rendered full-name text and the directive instance's options.
+    const row = await (await harness()).getRowByName(config.name)
+    const nameSpan = row.querySelector('.sc-search-config-row-name') as HTMLElement
+    expect(nameSpan).toBeTruthy()
+    expect(nameSpan.textContent.trim()).toBe(config.name)
+
+    const tooltip = hostFixture.debugElement.query(By.css(`.sc-search-config-row-name`)).injector.get(Tooltip)
+    expect(tooltip).toBeTruthy()
+    expect(tooltip.getOption('showOnEllipsis')).toBe(true)
+    expect(tooltip.getOption('tooltipLabel')).toBe(config.name)
+  })
+
+  it('should clear the select and emit the cleared selection when the selected config is deleted', async () => {
+    await patchConfigs([config, onlyValuesConfig])
+
+    // Seed the displayed data: the `searchConfigSelected` emission is driven by `currentConfig$`
+    // combined (via `withLatestFrom`) with `currentDisplayedData$`, which is filtered until
+    // `displayedSearchData` exists.
+    childStore.patchState({
+      displayedSearchData: {
+        fieldValues: {},
+        displayedColumnsIds: [],
+        viewMode: basicViewMode
+      }
+    })
+
+    // Select config-1 through the store (rather than the panel) so the panel is opened exactly once,
+    // by the trash-button lookup below.
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const select = (childComponent as any).select() as Select
+    expect(select.label()).toBe(config.name)
+
+    // Delete the selected config through the (mocked) confirm dialog.
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of({ button: 'primary' } as any))
+    ;(searchConfigServiceSpy.deleteSearchConfig as jest.Mock).mockReturnValue(of({} as any))
+    const searchConfigSelectedSpy = jest.spyOn(childComponent.searchConfigSelected, 'emit')
+    const trashButton = (await (await harness()).getDeleteButton(config.name)) as HTMLButtonElement
+    trashButton.click()
+    await hostFixture.whenStable()
+    // `store.deleteSearchConfig` runs in a `setTimeout` and `currentConfig$` is debounced (50ms).
+    await delay(120)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The deleted config was the current one, so the select no longer shows a value and the applied
+    // selection resets (the page's own values/columns are untouched — the store just clears the current
+    // config, which surfaces as a cleared `searchConfigSelected`).
+    expect(select.label()).toBe('p-emptylabel')
+    expect(searchConfigSelectedSpy).toHaveBeenCalledWith(undefined)
+  })
+
   it('should show the filter placeholder and the no-match text for a non-matching filter', async () => {
     await patchConfigs([config, onlyValuesConfig])
 
     // Open the panel so the in-panel filter input is rendered.
-    await listItems()
+    await openItems()
     await hostFixture.whenStable()
 
     const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLInputElement
@@ -1483,19 +1655,21 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
   it('should render the trash button inside a deletable row and none inside a read-only row', async () => {
     await patchConfigs([config, readonlyConfig])
 
-    await listItems()
-    await hostFixture.whenStable()
+    // The panel renders one row per option; the read-only config's row renders no trash button.
+    const h = await harness()
+    expect(await h.getDeleteButton(config.name)).toBeTruthy()
+    expect(await h.getDeleteButton(readonlyConfig.name)).toBeNull()
+  })
 
-    const rows = Array.from(hostFixture.nativeElement.querySelectorAll('.sc-search-config-row')) as HTMLElement[]
+  it('should reject getRowByName when no row matches the given name', async () => {
+    // A criteria-only config (no values) is patched but filtered out of the value-storing rows, so the
+    // panel renders no row for it and `getRowByName` rejects.
+    await patchConfigs([config, onlyColumnsConfig])
 
-    // The panel renders one row per option; the read-only config's row has no trash button.
-    const deletableRow = rows.find((row) => row.textContent?.includes(config.name))
-    const readonlyRow = rows.find((row) => row.textContent?.includes(readonlyConfig.name))
-    expect(deletableRow).toBeTruthy()
-    expect(readonlyRow).toBeTruthy()
-
-    expect(deletableRow!.querySelector('.sc-search-config-delete')).toBeTruthy()
-    expect(readonlyRow!.querySelector('.sc-search-config-delete')).toBeFalsy()
+    const h = await harness()
+    await expect(h.getRowByName(onlyColumnsConfig.name)).rejects.toThrow(
+      `No search-config row found for name "${onlyColumnsConfig.name}"`
+    )
   })
 })
 

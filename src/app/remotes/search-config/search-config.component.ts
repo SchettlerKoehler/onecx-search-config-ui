@@ -1,5 +1,5 @@
 import { AsyncPipe, Location } from '@angular/common'
-import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy } from '@angular/core'
+import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy, viewChild } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import {
@@ -18,7 +18,7 @@ import {
 
 import { ButtonModule } from 'primeng/button'
 import { PrimeIcons } from 'primeng/api'
-import { SelectModule } from 'primeng/select'
+import { Select, SelectModule } from 'primeng/select'
 import { FloatLabelModule } from 'primeng/floatlabel'
 import { InputGroupModule } from 'primeng/inputgroup'
 import { TooltipModule } from 'primeng/tooltip'
@@ -58,6 +58,7 @@ import {
   SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
 import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
+import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
 import { environment } from 'src/environments/environment'
 
 @Component({
@@ -100,6 +101,9 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   @Input() searchConfigSelected: EventEmitter<SearchConfigData | undefined> = new EventEmitter()
 
   readonly vm$ = this.searchConfigStore.searchConfigVm$.pipe(debounceTime(50))
+
+  // The config select, read for the keyboard delete shortcut (see `onSearchConfigSelectKeydown`).
+  readonly select = viewChild(Select)
 
   dataRevertSub: Subscription | undefined
   currentConfigSub: Subscription | undefined
@@ -281,59 +285,44 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
 
   onSearchConfigDelete(searchConfig: SearchConfigInfo) {
-    // Reusable confirm dialog (title/body/buttons) so the column remote can open the same one unchanged.
-    // The Delete button gets a fixed id and the danger look; the dialog carries the remote's data-style-id
-    // automatically via PortalDialogService scope identifier.
-    this.portalDialogService
-      .openDialog(
-        'SEARCH_CONFIG.DELETE_DIALOG.HEADER_QUESTION',
-        {
-          key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE_MESSAGE',
-          parameters: {
-            config: searchConfig.name
-          }
-        },
-        {
-          key: 'SEARCH_CONFIG.DELETE_DIALOG.DELETE',
-          id: this.deleteButtonId,
-          severity: 'danger'
-        },
-        'SEARCH_CONFIG.DELETE_DIALOG.CANCEL'
-      )
-      .pipe(
-        mergeMap((dialogResult) => {
-          if (!dialogResult) return of(undefined)
-          if (dialogResult.button !== 'primary') {
-            return of(undefined)
-          }
-          return this.deleteSearchConfig(searchConfig.id)
+    // The whole dialog (title, body, Delete/Cancel buttons with the fixed id and danger severity), the
+    // delete call and the success/error toasts live in the shared `confirmAndDeleteSearchConfig` helper
+    // so the column remote (#960) can open the same dialog unchanged. The dialog carries the remote's
+    // `data-style-id` automatically via the PortalDialogService scope identifier. On success the helper
+    // already fired the success toast; here we just remove the deleted config from the store.
+    confirmAndDeleteSearchConfig(
+      this.portalDialogService,
+      this.searchConfigService,
+      this.portalMessageService,
+      searchConfig,
+      this.deleteButtonId
+    ).subscribe((deleted) => {
+      if (deleted) {
+        setTimeout(() => {
+          this.searchConfigStore.deleteSearchConfig(searchConfig)
         })
-      )
-      .subscribe((result) => {
-        if (result !== undefined) {
-          this.portalMessageService.success({
-            summaryKey: 'SEARCH_CONFIG.DELETE_CONFIG_SUCCESS',
-            summaryParameters: {
-              config: searchConfig.name
-            }
-          })
-          setTimeout(() => {
-            this.searchConfigStore.deleteSearchConfig(searchConfig)
-          })
-        }
-      })
+      }
+    })
   }
 
-  private deleteSearchConfig(id: string) {
-    return this.searchConfigService.deleteSearchConfig(id).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.DELETE_FAILURE'
-        })
-        return of(undefined)
-      })
-    )
+  // Keyboard delete path (WCAG 2.1.1): PrimeNG keeps focus on the select combobox and moves between
+  // options with `aria-activedescendant`, so Tab never reaches the trash button nested inside a row.
+  // When the panel is open and the user presses Delete on a deletable option, delete it. PrimeNG's own
+  // Delete handler is a no-op here (`showClear` is not set) and does not stop the event, so this fires
+  // after it. See the `tabindex="-1"`/`aria-hidden` trash button in the template.
+  onSearchConfigSelectKeydown(event: KeyboardEvent): void {
+    const select = this.select()
+    if (event.code !== 'Delete' || !select || !select.overlayVisible) {
+      return
+    }
+    const focusedIndex = select.focusedOptionIndex()
+    if (focusedIndex < 0) {
+      return
+    }
+    const option = select.visibleOptions()[focusedIndex] as SearchConfigInfo | undefined
+    if (option && this.canDelete(option)) {
+      this.onSearchConfigDelete(option)
+    }
   }
 
   private saveSearchConfig(

@@ -1,4 +1,5 @@
 import { ContentContainerComponentHarness } from '@angular/cdk/testing'
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
 
 import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-testing'
 
@@ -30,7 +31,43 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
    */
   async getSelectItems(): Promise<ListItemHarness[]> {
     const select = await this.getConfigSelect()
-    /* istanbul ignore next */
     return (await select?.getSelectItems()) ?? []
+  }
+
+  /**
+   * The rendered rows (`.sc-search-config-row`) of the opened config panel, resolved against the remote
+   * element's native DOM. The panel is `self`-appended (a descendant of the remote), so it stays within
+   * the remote element rather than the document body.
+   */
+  private async _openPanelAndRows(): Promise<HTMLElement> {
+    await (await this.getConfigSelect())?.open()
+    const host = TestbedHarnessEnvironment.getNativeElement(await this.host())
+    return host as HTMLElement
+  }
+
+  /**
+   * The config row (`.sc-search-config-row`) rendered for a given config name. Opens the panel first so
+   * the rows are in the DOM, then resolves the row whose name text matches exactly.
+   */
+  async getRowByName(name: string): Promise<HTMLElement> {
+    const host = await this._openPanelAndRows()
+    const row = Array.from(host.querySelectorAll('.sc-search-config-row')).find((r) => {
+      const nameSpan = r.querySelector('.sc-search-config-row-name')
+      return nameSpan?.textContent?.trim() === name
+    })
+    if (!row) {
+      throw new Error(`No search-config row found for name "${name}"`)
+    }
+    return row as HTMLElement
+  }
+
+  /**
+   * The delete (trash) button rendered inside the config row for a given name, or `null` when the row is
+   * not deletable (no `SEARCHCONFIG#DELETE` permission or a read-only config) so the row renders no
+   * trash button.
+   */
+  async getDeleteButton(name: string): Promise<HTMLElement | null> {
+    const row = await this.getRowByName(name)
+    return row.querySelector('.sc-search-config-delete button.p-button') as HTMLElement | null
   }
 }

@@ -38,7 +38,7 @@
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
   /* Color of a config option-group header in the list (used by a later ticket). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
-  /* Width of the reusable delete-confirm dialog (reserved for #962; not applied yet). */
+  /* Width of the reusable delete-confirm dialog (applied via PortalDialogConfig.width). */
   --onecx-search-config-dialog-width: 30rem;
 }
 
@@ -58,10 +58,13 @@ ocx-search-config-component {
     width: var(--onecx-search-config-width);
   }
 
+  /* Round only the select's outer (start) corners so the join with Save As stays square; PrimeNG's
+   * input-group rules reset the control's `border-radius`, so a flat `border-radius` here would be
+   * dead. (The redundant `border-color` override has been dropped.) */
   .sc-search-config-select {
     height: var(--onecx-search-config-height);
-    border-radius: var(--onecx-search-config-radius);
-    border-color: var(--onecx-search-config-border-color);
+    border-start-start-radius: var(--onecx-search-config-radius);
+    border-end-start-radius: var(--onecx-search-config-radius);
   }
 
   /* Config-select option list: single-line rows (ellipsis + tooltip). */
@@ -96,8 +99,11 @@ ocx-search-config-component {
   .sc-search-config-save-as {
     height: var(--onecx-search-config-height);
 
+    /* Round the Save As button's outer (end) corners to complement the select's start corners. */
     .p-button {
       height: 100%;
+      border-start-end-radius: var(--onecx-search-config-radius);
+      border-end-end-radius: var(--onecx-search-config-radius);
     }
   }
 }
