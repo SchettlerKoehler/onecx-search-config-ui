@@ -5,9 +5,9 @@ import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-
 import { SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 
 /**
- * Config select of the search header remote. The `p-select` panel and tooltips render inside the
- * remote's element (in-remote `appendTo`), so the panel is reachable from the document root while
- * staying scoped to this remote.
+ * Config select of the search header remote. The `p-select` panel renders inside `<p-select>`
+ * (PrimeNG's default `self` appendTo), so it stays scoped to this remote; tooltips append to `body`
+ * (forced: PrimeNG Tooltip only positions correctly with `body`/`target`).
  */
 export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
   static readonly hostSelector = 'app-ocx-search-config'
@@ -24,12 +24,13 @@ export class OneCXSearchConfigHarness extends ContentContainerComponentHarness {
   }
 
   /**
-   * Rows of the opened config select. The panel is appended to the remote element, i.e. outside the
-   * `<p-select>` host, so it must be resolved from the document root (see `PSelectHarness#getSelectItems`);
-   * pick a single row by its rendered text from the returned list.
+   * Rows of the opened config select. The panel renders inside `<p-select>` (PrimeNG's default `self`
+   * appendTo), but `PSelectHarness#getSelectItems` still resolves items from the document root (see
+   * `PSelectHarness#getSelectItems`); pick a single row by its rendered text from the returned list.
    */
   async getSelectItems(): Promise<ListItemHarness[]> {
     const select = await this.getConfigSelect()
+    /* istanbul ignore next */
     return (await select?.getSelectItems()) ?? []
   }
 }

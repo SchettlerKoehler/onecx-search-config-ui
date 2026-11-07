@@ -30,19 +30,26 @@
   --onecx-search-config-border-color: var(--p-select-border-color);
   /* Maximum height of the opened option list (overlay) before it scrolls. */
   --onecx-search-config-panel-max-height: 20rem;
+  /* Delete (trash) icon color — the PrimeNG danger (red) button color. */
+  --onecx-search-config-delete-color: var(--p-button-danger-background);
+  /* Light-red hover background behind the trash icon (PrimeNG text-danger hover tint). */
+  --onecx-search-config-delete-hover-background: var(--p-button-text-danger-active-background);
   /* Color of the "modified" marker on a config row (used by a later ticket). */
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
   /* Color of a config option-group header in the list (used by a later ticket). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
+  /* Width of the reusable delete-confirm dialog (applied by the host via data-style-id). */
+  --onecx-search-config-dialog-width: 30rem;
 }
 
 /*
  * Search header remote: the config select joined to the Save As button.
  *
  * Selectors are rooted at the remote's host element (ocx-search-config-component, registered as
- * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel and
- * tooltips render inside the remote's element (in-remote appendTo), so they are descendants of the
- * host element and are reached through the stable panelStyleClass / styleClass hooks. The
+ * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
+ * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the
+ * host element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips
+ * append to `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The
  * delete-confirm dialog is portaled outside the remote element and is sized and reached by the
  * host through data-style-id scoping (see the README).
  */
@@ -75,10 +82,13 @@ ocx-search-config-component {
       text-overflow: ellipsis;
     }
 
-    /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. */
+    /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. The
+     * :root variables drive the button through these scoped PrimeNG danger-token overrides. */
     .sc-search-config-delete {
       flex: 0 0 auto;
       margin: 0;
+      --p-button-text-danger-color: var(--onecx-search-config-delete-color);
+      --p-button-text-danger-hover-background: var(--onecx-search-config-delete-hover-background);
     }
   }
 

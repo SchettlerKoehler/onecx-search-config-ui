@@ -23,11 +23,16 @@ unscoped global selectors. Remotes inherit the host theme and set no theme of th
 | `--onecx-search-config-radius` | Corner radius of the config select control. | `var(--p-select-border-radius)` |
 | `--onecx-search-config-border-color` | Border color of the config select control. | `var(--p-select-border-color)` |
 | `--onecx-search-config-panel-max-height` | Maximum height of the opened option list before it scrolls. | `20rem` (app-owned layout cap) |
+| `--onecx-search-config-delete-color` | Color of the per-row delete (trash) icon. | `var(--p-button-danger-background)` (PrimeNG danger/red) |
+| `--onecx-search-config-delete-hover-background` | Light-red background behind the trash icon on hover/focus. | `var(--p-button-text-danger-active-background)` |
 | `--onecx-search-config-modified-marker-color` | Color of the "modified" marker on a config row. | `var(--p-button-text-warn-color)` |
 | `--onecx-search-config-group-header-color` | Color of a config option-group header in the list. | `var(--p-select-option-group-color)` |
+| `--onecx-search-config-dialog-width` | Width of the reusable delete-confirm dialog. | `30rem` (app-owned; applied by the host via the dialog's `data-style-id` scoping) |
 
-The per-row delete (trash) icon is the PrimeNG `text` + `danger` severity button, so it is red with the
-`--p-button-text-danger-*` tokens and needs no custom color. The delete-confirm dialog is portaled outside
-the remote element; it carries the remote's `data-style-id`, so the host's scoped styling reaches it. Its
-Delete button is the danger (red) button through its fixed id (`ocx-search-config-delete-button`).
-The "Saved searches" section is delivered in a later ticket (#964).
+The per-row delete (trash) icon is the PrimeNG `text` + `danger` severity button; its red colour and
+light-red hover background are sourced from `--onecx-search-config-delete-color` and
+`--onecx-search-config-delete-hover-background`, which drive the button through scoped
+`--p-button-text-danger-*` token overrides on the trash hook. The delete-confirm dialog is portaled
+outside the remote element; it carries the remote's `data-style-id`, so the host's scoped styling
+reaches it. Its Delete button is the danger (red) button through its fixed id
+(`ocx-search-config-delete-button`). The "Saved searches" section is delivered in a later ticket (#964).

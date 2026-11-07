@@ -1220,9 +1220,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
   }
 
-  // The panel renders inside the <p-select> host (PrimeNG's in-remote overlayAppendTo default), so it
-  // stays scoped to this remote. #getSelectItems resolves against the document root and works; pick the
-  // wanted row from the returned list.
+  // The panel renders inside the <p-select> host (PrimeNG's default `self` appendTo), so it stays
+  // scoped to this remote; tooltips append to `body` (forced). #getSelectItems resolves against the
+  // document root and works; pick the wanted row from the returned list.
   const findItemByText = async (items: Awaited<ReturnType<PSelectHarness['getSelectItems']>>, text: string) => {
     for (const item of items) {
       if ((await item.getText()) === text) {
@@ -1370,8 +1370,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     const select = hostFixture.nativeElement.querySelector('p-select') as HTMLElement
     expect(select.classList.contains('sc-search-config-select')).toBe(true)
 
-    // The opened panel carries the panelStyleClass hook and renders inside the remote's element
-    // (in-remote appendTo), so it resolves from the remote element rather than the document body.
+    // The opened panel carries the panelStyleClass hook and renders inside `<p-select>` (PrimeNG
+    // default `self`), which is a descendant of the remote element, so it resolves from the remote
+    // element rather than the document body.
     const panel = hostFixture.nativeElement.querySelector('.sc-search-config-panel') as HTMLElement
     expect(panel).toBeTruthy()
   })

@@ -20,7 +20,6 @@
     },
     "SELECT": {
       "LABEL": "Search Config",
-      "ARIA_LABEL": "Select search config",
       "NO_CONFIGS_LABEL": "No search configs",
       "FILTER_PLACEHOLDER": "Filter by name",
       "NO_MATCH": "No matching configs"

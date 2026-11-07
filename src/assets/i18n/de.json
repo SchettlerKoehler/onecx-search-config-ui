@@ -20,7 +20,6 @@
     },
     "SELECT": {
       "LABEL": "Suchkonfiguration",
-      "ARIA_LABEL": "Suchkonfiguration auswählen",
       "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
       "FILTER_PLACEHOLDER": "Nach Name filtern",
       "NO_MATCH": "Keine passenden Suchkonfigurationen"

@@ -18,7 +18,7 @@
           scrollHeight="var(--onecx-search-config-panel-max-height)"
           inputId="sc_search_config_select"
           [disabled]="vm.searchConfigs.length === 0"
-          [ariaLabel]="'SEARCH_CONFIG.SELECT.ARIA_LABEL' | translate"
+          [ariaLabelledBy]="'sc_search_config_label'"
         >
           <ng-template #item let-config>
             <div class="sc-search-config-row">
@@ -38,7 +38,7 @@
             </div>
           </ng-template>
         </p-select>
-        <label class="sc-search-config-label" for="sc_search_config_select">
+        <label class="sc-search-config-label" id="sc_search_config_label">
           {{
             (vm.searchConfigs.length === 0 ? 'SEARCH_CONFIG.SELECT.NO_CONFIGS_LABEL' : 'SEARCH_CONFIG.SELECT.LABEL')
               | translate
