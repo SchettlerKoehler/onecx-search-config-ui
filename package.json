@@ -95,7 +95,7 @@
     "@nx/js": "22.6.4",
     "@nx/workspace": "22.6.4",
     "@openapitools/openapi-generator-cli": "^2.13.4",
-    "@onecx/build-utils": "^8.7.0",
+    "@onecx/build-utils": "^8.0.0",
     "@schematics/angular": "^21.0.0",
     "@swc-node/register": "~1.12.1",
     "@swc/core": "^1.15.47",

@@ -2,7 +2,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing'
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing'
 import { NoopAnimationsModule } from '@angular/platform-browser/animations'
 import { createApplication } from '@angular/platform-browser'
-import { NgZone, ɵNoopNgZone as NoopNgZone } from '@angular/core'
+import { EnvironmentProviders, NgZone, Provider, ɵNoopNgZone as NoopNgZone } from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
 import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
@@ -21,6 +21,7 @@ import {
   provideShellCapabilityServiceMock
 } from '@onecx/angular-integration-interface/mocks'
 import { provideTranslateTestingService } from '@onecx/angular-testing'
+import { getWindowState } from '@onecx/angular-webcomponents'
 
 import {
   SEARCH_CONFIG_STORE_NAME,
@@ -1074,18 +1075,38 @@ describe('column-group-selection zone-based change detection', () => {
       lang$: of('en', 'en')
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const app = await createApplication({
-      providers: [
-        ...columnGroupSelectionProviders(undefined),
-        ...shellMocks,
-        { provide: UserService, useValue: userServiceStub }
-      ]
-    } as any)
+    const providers: (Provider | EnvironmentProviders)[] = [
+      ...columnGroupSelectionProviders(undefined),
+      ...shellMocks,
+      { provide: UserService, useValue: userServiceStub }
+    ]
+    const app = await createApplication({ providers })
     const zone = app.injector.get(NgZone)
 
     expect(zone).toBeInstanceOf(NgZone)
     expect(zone).not.toBeInstanceOf(NoopNgZone)
+
+    app.destroy()
+  }, 20000)
+
+  it('reuses the shell NgZone instead of creating a private one', async () => {
+    const shellZone = new NgZone({})
+    // The shell publishes its NgZone here before the remote boots; the remote's
+    // providers must re-provide this same instance (see createRemoteProviders).
+    getWindowState().ngZone = shellZone
+
+    const providers: (Provider | EnvironmentProviders)[] = [
+      { provide: NgZone, useValue: shellZone },
+      ...columnGroupSelectionProviders(undefined),
+      {
+        provide: UserService,
+        useValue: { isInitialized: Promise.resolve(), lang$: of('en', 'en') }
+      }
+    ]
+    const app = await createApplication({ providers })
+
+    expect(app.injector.get(NgZone)).toBeInstanceOf(NgZone)
+    expect(app.injector.get(NgZone)).toBe(shellZone)
 
     app.destroy()
   }, 20000)

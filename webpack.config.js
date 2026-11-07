@@ -54,9 +54,10 @@ module.exports = {
       name: 'onecx-search-config-ui',
       filename: 'remoteEntry.js',
       library: { type: 'module' },
-      // Nothing in this repo (or the shell) consumes the generated DTS /
-      // @mf-types.zip / mf-stats.json artifacts, so skip the federated-types
-      // (DTS) step on every build.
+      // Nothing in this repo (or the shell) consumes the federated-types (DTS)
+      // output, so skip the DTS generation step on every build. This only skips
+      // the DTS step: mf-stats.json and mf-manifest.json are still emitted into
+      // dist.
       dts: false,
       shareScope: 'angular_21',
       exposes: {
