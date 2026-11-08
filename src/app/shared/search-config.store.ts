@@ -269,12 +269,10 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
     // The current config is retained even when its stored values no longer match the page — the
     // mismatch surfaces as a derived `modified` flag (see `searchConfigVm$`), not a deselection.
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, state.currentSearchConfig)
-
+    // A page values change never re-points the column-group selection at the retained config: the
+    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
+    // (re-syncing it would snap the select back to the config's own column group).
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       fieldValues: parsedValues,
       displayedSearchData: {
         fieldValues: parsedValues,
@@ -293,12 +291,10 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
     // The current config is retained even when its stored columns no longer match the page — the
     // mismatch surfaces as a derived `modified` flag (see `columnSelectionVm$`), not a deselection.
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, state.currentSearchConfig)
-
+    // A page columns change never re-points the column-group selection at the retained config: the
+    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
+    // (re-syncing it would snap the select back to the config's own column group).
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       displayedColumnsIds: displayedColumnsIds,
       displayedSearchData: {
         fieldValues: state.displayedSearchData?.fieldValues,
@@ -317,12 +313,10 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
     // The current config is retained even when its stored view mode no longer matches the page —
     // the mismatch surfaces as a derived `modified` flag (see `searchConfigVm$`), not a deselection.
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, state.currentSearchConfig)
-
+    // A page view-mode change never re-points the column-group selection at the retained config: the
+    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
+    // (re-syncing it would snap the select back to the config's own column group).
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       viewMode: viewMode,
       displayedSearchData: {
         fieldValues: state.displayedSearchData?.fieldValues,

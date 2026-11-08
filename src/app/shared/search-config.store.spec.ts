@@ -458,14 +458,18 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should keep the selected group key and the config when the values of a both-inputs-and-columns config change', (done) => {
+    it('should not re-point the column-group selection when field values of a retained config change', (done) => {
+      // The "Sales"/"Wide" scenario: the header's current config stores columns and the column-group
+      // selection points at a *different* saved config. A page values change must not drag the
+      // selection back onto the current config's own column group (the retained config is reported
+      // `modified`, it is not the selection).
       store.patchState({
-        searchConfigs: [testConfigValuesAndColumns],
+        searchConfigs: [testConfigValuesAndColumns, testConfigBase],
         fieldValues: {
           ...testConfigValuesAndColumns.values
         },
         currentSearchConfig: testConfigValuesAndColumns,
-        selectedGroupKey: testConfigValuesAndColumns.name,
+        selectedGroupKey: testConfigBase.name,
         customGroupKey: 'custom-key',
         columnGroupComponentActive: true
       })
@@ -476,9 +480,9 @@ describe('SearchConfigStore', () => {
       })
 
       store.selectedGroupKey$.pipe(take(1)).subscribe((key) => {
-        // The config is retained (not deselected) and its selected key keeps pointing at it — the
-        // mismatch surfaces as a `modified` flag rather than a reset to the custom group.
-        expect(key).toBe(testConfigValuesAndColumns.name)
+        // The selection stays on the distinct saved config the user picked; a values change surfaces
+        // as a `modified` flag on the retained config, not a snap of the select.
+        expect(key).toBe(testConfigBase.name)
         done()
       })
     })
@@ -638,12 +642,16 @@ describe('SearchConfigStore', () => {
         })
       })
 
-      it('should keep the selected group key and the config when the columns of a both-inputs-and-columns config change', (done) => {
+      it('should not re-point the column-group selection when the displayed columns of a retained config change', (done) => {
+        // The "Sales"/"Wide" scenario: the header's current config stores columns and the column-group
+        // selection points at a *different* saved config. A page columns change must not drag the
+        // selection back onto the current config's own column group (the retained config is reported
+        // `modified`, it is not the selection).
         store.patchState({
-          searchConfigs: [testConfigValuesAndColumns],
+          searchConfigs: [testConfigValuesAndColumns, testConfigBase],
           displayedColumnsIds: testConfigValuesAndColumns.columns,
           currentSearchConfig: testConfigValuesAndColumns,
-          selectedGroupKey: testConfigValuesAndColumns.name,
+          selectedGroupKey: testConfigBase.name,
           customGroupKey: 'custom-key',
           columnGroupComponentActive: true
         })
@@ -651,9 +659,9 @@ describe('SearchConfigStore', () => {
         store.updateDisplayedColumnsIds([...testConfigValuesAndColumns.columns, 'newCol'])
 
         store.selectedGroupKey$.pipe(take(1)).subscribe((key) => {
-          // The config is retained (not deselected) and its selected key keeps pointing at it — the
-          // column mismatch surfaces as a `modified` flag rather than a reset to the custom group.
-          expect(key).toBe(testConfigValuesAndColumns.name)
+          // The selection stays on the distinct saved config the user picked; the column mismatch
+          // surfaces as a `modified` flag on the retained config, not a snap of the select.
+          expect(key).toBe(testConfigBase.name)
           done()
         })
       })
