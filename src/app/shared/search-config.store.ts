@@ -1,6 +1,5 @@
 import { Inject, Injectable, InjectionToken } from '@angular/core'
 import { ComponentStore } from '@ngrx/component-store'
-import { TranslateService } from '@ngx-translate/core'
 import { filter, tap, withLatestFrom } from 'rxjs'
 
 import { Topic } from '@onecx/accelerator'
@@ -96,7 +95,6 @@ export interface ColumnGroupSelectOption {
   label: string
   value: string
   isPredefined?: boolean
-  isReadonly?: boolean
   config?: SearchConfigInfo
 }
 
@@ -134,14 +132,11 @@ export const initialState: SearchConfigState = {
 
 @Injectable()
 export class SearchConfigStore extends ComponentStore<SearchConfigState> {
-  columnGroupComponentReloading = false
-
   constructor(
     @Inject(SEARCH_CONFIG_STORE_NAME)
     private readonly storeName: string,
     @Inject(SEARCH_CONFIG_TOPIC)
-    private readonly searchConfigTopic$: SearchConfigTopic,
-    private readonly translateService?: TranslateService
+    private readonly searchConfigTopic$: SearchConfigTopic
   ) {
     super(initialState)
     this.activateStore(storeName)
@@ -164,30 +159,9 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     return { ...state, ...stateToUpdate }
   })
 
-  readonly deactivateColumnGroupStore = this.updater((state) => {
-    return {
-      ...state,
-      columnGroupComponentActive: false
-    }
-  })
-
   readonly setPageName = this.updater((state, newPageName: string) => {
     const stateToUpdate: Partial<SearchConfigState> = {
       pageName: newPageName
-    }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  // Standalone (column-group) use: the host often does not set `pageName`, so the config load and Save As
-  // derive a fallback from `getLocation().applicationPath`. Set it only while `pageName` is still
-  // undefined so a header-provided page name always wins once it arrives.
-  readonly ensureStandalonePageName = this.updater((state, fallbackPageName: string) => {
-    if (state.pageName !== undefined) {
-      return state
-    }
-    const stateToUpdate: Partial<SearchConfigState> = {
-      pageName: fallbackPageName
     }
     this.sendUpdateMessage(stateToUpdate, state)
     return { ...state, ...stateToUpdate }
@@ -421,9 +395,12 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   // Grouped options for the column-group config select, built here so the template binds them and the
   // leaf carries its saved `config` (no name-based lookup in the row). Predefined leaves are marked
   // `isPredefined` so they are never confused with a saved config of the same name.
+  //
+  // The group and predefined-leaf labels are emitted as raw i18n keys (the saved-leaf labels are the
+  // config's own `name`); the consuming remote translates them reactively so a language switch is
+  // reflected without any store round-trip.
   readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
     const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
-    const label = (key: string) => (this.translateService ? this.translateService.instant(key) : key)
     return {
       searchConfigsWithColumns: searchConfigsWithColumns,
       nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
@@ -431,21 +408,20 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       customGroupKey: state.customGroupKey,
       options: [
         {
-          label: label('COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED'),
+          label: 'COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED',
           value: 'predefined',
           items: state.nonSearchConfigGroupKeys.map((key) => ({
-            label: label(key),
+            label: key,
             value: key,
             isPredefined: true
           }))
         },
         {
-          label: label('COLUMN_GROUP_SELECTION.GROUPS.SAVED'),
+          label: 'COLUMN_GROUP_SELECTION.GROUPS.SAVED',
           value: 'saved',
           items: searchConfigsWithColumns.map((config) => ({
             label: config.name,
             value: config.name,
-            isReadonly: config.isReadonly,
             config
           }))
         }

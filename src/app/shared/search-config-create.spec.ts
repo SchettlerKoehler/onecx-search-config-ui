@@ -1,11 +1,11 @@
-import { BehaviorSubject, lastValueFrom, of, throwError } from 'rxjs'
+import { BehaviorSubject, Subject, lastValueFrom, of, throwError } from 'rxjs'
 
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { AppStateService, PortalMessageService } from '@onecx/angular-integration-interface'
 
 import { SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
 import { advancedViewMode } from './constants'
-import { createSearchConfig, loadSearchConfigInfos, resolveStandalonePageName } from './search-config-create'
+import { createSearchConfig, loadSearchConfigInfos } from './search-config-create'
 import { SearchConfigStore } from './search-config.store'
 
 describe('search-config-create', () => {
@@ -48,9 +48,6 @@ describe('search-config-create', () => {
       }
     } as any
     store = {
-      state$: new BehaviorSubject({ pageName: undefined } as any),
-      ensureStandalonePageName: jest.fn(),
-      pageName$: of('page-name'),
       currentPageData$: of({
         fieldValues: { f1: 'v1' },
         viewMode: advancedViewMode,
@@ -58,27 +55,6 @@ describe('search-config-create', () => {
         columnGroupKey: undefined
       })
     } as unknown as SearchConfigStore
-  })
-
-  describe('resolveStandalonePageName', () => {
-    it('should return the store page name when it is already set', async () => {
-      store = { ...store, state$: new BehaviorSubject({ pageName: 'header-page' } as any) } as any
-
-      const page = await lastValueFrom(resolveStandalonePageName(store, 'fallback'))
-
-      expect(page).toBe('header-page')
-      expect(store.ensureStandalonePageName).not.toHaveBeenCalled()
-    })
-
-    it('should apply and return the fallback while the store page name is undefined', async () => {
-      const ensureStandalonePageName = jest.fn()
-      store = { ...store, ensureStandalonePageName } as any
-
-      const page = await lastValueFrom(resolveStandalonePageName(store, 'fallback'))
-
-      expect(page).toBe('fallback')
-      expect(ensureStandalonePageName).toHaveBeenCalledWith('fallback')
-    })
   })
 
   describe('loadSearchConfigInfos', () => {
@@ -147,6 +123,37 @@ describe('search-config-create', () => {
       guard.next(true)
       expect(getSearchConfigInfos).toHaveBeenCalledWith({ appId: 'appId', page: 'page-name', productName: 'product' })
       expect(emissions).toStrictEqual([[testConfig]])
+      subscription.unsubscribe()
+    })
+
+    it('should cancel and discard a fallback-page fetch once the header becomes active', () => {
+      // The gate is projected inside the switchMap, so when the header becomes active (the guard
+      // flips to false) before the in-flight fallback-page fetch responds, the stale request is
+      // cancelled and its result discarded — a plain `filter` would have let it store the wrong
+      // page's configs.
+      const guard = new BehaviorSubject(true)
+      const inFlight = new Subject<{ configs: SearchConfigInfo[] }>()
+      getSearchConfigInfos.mockReturnValue(inFlight)
+
+      const emissions: SearchConfigInfo[][] = []
+      const subscription = loadSearchConfigInfos(
+        baseUrl,
+        appStateService,
+        searchConfigService,
+        messageService,
+        of('page-name'),
+        guard
+      ).subscribe((configs) => emissions.push(configs))
+
+      expect(getSearchConfigInfos).toHaveBeenCalledTimes(1)
+
+      guard.next(false)
+
+      inFlight.next({ configs: [testConfig] })
+      inFlight.complete()
+
+      expect(emissions).toStrictEqual([])
+      expect(getSearchConfigInfos).toHaveBeenCalledTimes(1)
       subscription.unsubscribe()
     })
   })

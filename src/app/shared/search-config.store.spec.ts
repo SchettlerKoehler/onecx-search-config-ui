@@ -101,21 +101,6 @@ describe('SearchConfigStore', () => {
     })
   })
 
-  describe('deactivate column group store', () => {
-    it('should update isColumnGroupComponentActive$ selector', (done) => {
-      store.patchState({
-        columnGroupComponentActive: true
-      })
-
-      store.deactivateColumnGroupStore()
-
-      store.isColumnGroupComponentActive$.pipe(take(1)).subscribe((isActive) => {
-        expect(isActive).toBeFalsy()
-        done()
-      })
-    })
-  })
-
   describe('set page name', () => {
     it('should update pageName$ selector on change', (done) => {
       store.patchState({})
@@ -138,26 +123,6 @@ describe('SearchConfigStore', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(error)
       consoleErrorSpy.mockRestore()
-    })
-  })
-
-  describe('ensure standalone page name', () => {
-    it('should set the page name to the fallback while it is still undefined', () => {
-      store.patchState({})
-
-      store.ensureStandalonePageName('fallback-page')
-
-      expect(store.state().pageName).toBe('fallback-page')
-    })
-
-    it('should keep a header-provided page name over the fallback', () => {
-      store.patchState({
-        pageName: 'header-page'
-      })
-
-      store.ensureStandalonePageName('fallback-page')
-
-      expect(store.state().pageName).toBe('header-page')
     })
   })
 
@@ -730,7 +695,6 @@ describe('SearchConfigStore', () => {
           {
             label: testConfigOnlyColumns.name,
             value: testConfigOnlyColumns.name,
-            isReadonly: testConfigOnlyColumns.isReadonly,
             config: testConfigOnlyColumns
           }
         ])

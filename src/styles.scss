@@ -21,7 +21,7 @@
   /* Corner radius of the control, matched to the PrimeNG select token. */
   --onecx-search-config-radius: var(--p-select-border-radius);
   /* Control border color — reserved for a later ticket (no selector reads it yet, so applying the
-   * select border color via this variable would be dead CSS, like the marker/group-header tokens). */
+   * select border color via this variable would be dead CSS, like the modified-marker token). */
   --onecx-search-config-border-color: var(--p-select-border-color);
   /* Maximum height of the opened option list (overlay) before it scrolls. Matches the prototype. */
   --onecx-search-config-panel-max-height: 16rem;

@@ -1,4 +1,4 @@
-import { catchError, combineLatest, filter, map, of, switchMap, take, tap, withLatestFrom, Observable } from 'rxjs'
+import { EMPTY, Observable, catchError, combineLatest, map, of, switchMap, withLatestFrom } from 'rxjs'
 
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { AppStateService, PortalMessageService } from '@onecx/angular-integration-interface'
@@ -19,40 +19,22 @@ import { advancedViewMode } from 'src/app/shared/constants'
 import { parseFieldValues } from 'src/app/shared/search-config.utils'
 
 /**
- * Resolves the page name for standalone column-group use, where the host often does not set `pageName`.
- * The store's `pageName` wins once it is defined (a header-provided page name always wins); while it is
- * still `undefined` the fallback (derived from `getLocation().applicationPath`) is applied via
- * `ensureStandalonePageName` and returned.
- *
- * Reads the store once, on the current state, so it resolves to whatever page name is known at the moment
- * the load or Save As runs: the header's page name if it has already arrived, otherwise the fallback.
- */
-export function resolveStandalonePageName(store: SearchConfigStore, fallbackPageName: string): Observable<string> {
-  return store.state$.pipe(
-    take(1),
-    switchMap((state) => {
-      if (state.pageName !== undefined) {
-        return of(state.pageName)
-      }
-      return of(fallbackPageName).pipe(
-        tap(() => {
-          store.ensureStandalonePageName(fallbackPageName)
-        })
-      )
-    })
-  )
-}
-
-/**
  * Fetches the saved configs once the remote base url, the page name and the current MFE are all known,
  * then emits the response configs. A failed request fires an error toast and emits no configs. The
  * caller stores the result (`store.setSearchConfigs`).
  *
  * `pageName` is the page-name observable for the caller: the search header remote passes the store's
- * `pageName$` (so it loads only once a page name is provided), while the column-group remote passes
- * `resolveStandalonePageName` (so it loads in standalone use with a fallback page name). `shouldLoad`
- * optionally gates the whole load — the column-group remote skips it while the search header remote is
- * active, avoiding a duplicate, racing GET for the same page/MFE.
+ * `pageName$` (so it loads only once a page name is provided), while the column-group remote passes a
+ * live selector over the store (`pageName ?? applicationPath`), so it loads in standalone use with a
+ * fallback page name that a header-provided page name replaces the moment it arrives — without ever
+ * writing the fallback into the shared store.
+ *
+ * `shouldLoad` optionally gates the load from inside the `switchMap`: the column-group remote passes
+ * `!isSearchConfigComponentActive$` so the GET is skipped (and any in-flight request cancelled) as soon
+ * as the search header remote becomes active. Because the gate is projected rather than filtered in
+ * front of the `switchMap`, a stale request started while the gate was open is cancelled and its result
+ * discarded — a plain `filter` neither cancels the request nor drops the response, which let the column
+ * remote's fallback-page GET race the header's and, on last-write-wins, store the wrong page's configs.
  */
 export function loadSearchConfigInfos(
   baseUrl: Observable<RemoteComponentConfig>,
@@ -64,9 +46,11 @@ export function loadSearchConfigInfos(
 ): Observable<SearchConfigInfo[]> {
   const gate$ = shouldLoad ?? of(true)
   return combineLatest([baseUrl, appStateService.currentMfe$.asObservable(), pageName, gate$]).pipe(
-    filter(([, , , load]) => load === true),
-    switchMap(([, currentMfe, page]) =>
-      searchConfigService
+    switchMap(([, currentMfe, page, load]) => {
+      if (!load) {
+        return EMPTY
+      }
+      return searchConfigService
         .getSearchConfigInfos({
           appId: currentMfe.appId,
           page,
@@ -82,7 +66,7 @@ export function loadSearchConfigInfos(
             return of([] as SearchConfigInfo[])
           })
         )
-    )
+    })
   )
 }
 
@@ -91,11 +75,12 @@ export function loadSearchConfigInfos(
  * and sends the create request. A failed create fires an error toast and resolves to `undefined`; the
  * caller fires the success toast and updates the store once it resolves with a created `id`.
  *
- * `pageName` is the resolved page-name observable (the store's `pageName$` for the header, or
- * `resolveStandalonePageName` for the standalone column-group use) and is applied to the request.
- * Combining the confirmed dialog result with the current MFE, page data and page name via
- * `withLatestFrom` means a confirmed dialog is never dropped: the confirmed dialog result is what drives
- * the single emission, and the fallback guarantees a page name in the standalone case.
+ * `pageName` is the resolved page-name observable (the store's `pageName$` for the header, or the
+ * column-group remote's live `pageName ?? applicationPath` selector for standalone use) and is applied
+ * to the request. Combining the confirmed dialog result with the current MFE, page data and page name
+ * via `withLatestFrom` means a confirmed dialog is never dropped: the confirmed dialog result is what
+ * drives the single emission, and the live selector always has a value, so a page name is present in the
+ * standalone case too.
  */
 export function createSearchConfig(
   portalDialogService: PortalDialogService,

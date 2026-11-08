@@ -11,7 +11,7 @@ import {
 } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import { BehaviorSubject, ReplaySubject, Subscription, debounceTime, map, withLatestFrom } from 'rxjs'
+import { BehaviorSubject, ReplaySubject, Subscription, combineLatest, debounceTime, map, withLatestFrom } from 'rxjs'
 
 import { PrimeIcons } from 'primeng/api'
 import { ButtonModule } from 'primeng/button'
@@ -38,14 +38,14 @@ import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-u
 
 import { Configuration, SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
 import { environment } from 'src/environments/environment'
-import { ColumnSelectionViewModel, SearchConfigStore } from 'src/app/shared/search-config.store'
+import {
+  ColumnGroupSelectOption,
+  ColumnSelectionViewModel,
+  SearchConfigStore
+} from 'src/app/shared/search-config.store'
 import { COLUMN_GROUP_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
-import {
-  createSearchConfig,
-  loadSearchConfigInfos,
-  resolveStandalonePageName
-} from 'src/app/shared/search-config-create'
+import { createSearchConfig, loadSearchConfigInfos } from 'src/app/shared/search-config-create'
 
 @Component({
   selector: 'app-ocx-column-group-selection',
@@ -96,12 +96,6 @@ export class OneCXColumnGroupSelectionComponent
     })
   }
 
-  @Input() set pageName(pageName: string) {
-    setTimeout(() => {
-      this.searchConfigStore.setPageName(pageName)
-    })
-  }
-
   @Input() groupSelectionChanged: EventEmitter<ColumnGroupData> = new EventEmitter()
 
   columns$ = new BehaviorSubject<DataTableColumn[]>([])
@@ -116,7 +110,29 @@ export class OneCXColumnGroupSelectionComponent
   @Input() defaultGroupKey = ''
   @Input() placeholderKey = ''
 
-  readonly vm$ = this.searchConfigStore.columnSelectionVm$.pipe(debounceTime(50))
+  // The store emits raw i18n keys for the group headers and the predefined leaves (and the config's
+  // own `name` for saved leaves); the labels are translated here, against `translateService.stream`, so
+  // a language switch (or the remote translations arriving over HTTP) is reflected without any store
+  // round-trip rather than being frozen at the moment of the last state change.
+  readonly vm$ = combineLatest([
+    this.searchConfigStore.columnSelectionVm$,
+    this.translateService.stream(['COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED', 'COLUMN_GROUP_SELECTION.GROUPS.SAVED'])
+  ]).pipe(
+    debounceTime(50),
+    map(([raw, translations]) => {
+      const t = translations as Record<string, string>
+      return {
+        ...raw,
+        options: raw.options?.map((group) => ({
+          ...group,
+          label: t[group.label] ?? group.label,
+          items: group.items.map((item) =>
+            item.isPredefined ? { ...item, label: this.translateService.instant(item.value) } : item
+          )
+        }))
+      }
+    })
+  )
 
   // The grouped config select, read for the row identity and the keyboard handlers.
   readonly select = viewChild(Select)
@@ -202,15 +218,21 @@ export class OneCXColumnGroupSelectionComponent
     this.permissions = config.permissions
   }
 
-  // The page name for this remote's own requests: the store's `pageName` once it is defined (a
-  // header-provided page name always wins), otherwise a fallback derived from the application path.
+  // The page name for this remote's own requests, read live from the store without persisting anything:
+  // the header's `pageName` wins the moment it arrives (the store is the shared source of truth),
+  // otherwise a fallback derived from the application path. Because this is a live selector — not a
+  // snapshot taken once at construction — the load and Save As both see the header's page name as soon
+  // as it is delivered over the topic, and the fallback is never written to (or broadcast from) the
+  // shared store.
   private resolvePageName() {
-    return resolveStandalonePageName(this.searchConfigStore, getLocation().applicationPath)
+    return this.searchConfigStore.select((state) => state.pageName ?? getLocation().applicationPath)
   }
 
   // Load the saved configs once the remote base url, the page name and the current MFE are all
-  // available. The load is skipped while the search header remote is active so only one of the two
-  // remotes performs the (same) GET.
+  // available. The `!isSearchConfigComponentActive$` gate is projected inside the `switchMap`, so while
+  // the search header remote is active (or becomes active) the column remote's request is cancelled and
+  // its result discarded — only one of the two remotes performs the (same) GET, and a fallback-page
+  // response can never overwrite the header's list.
   private loadSearchConfigs(): void {
     loadSearchConfigInfos(
       this.baseUrl,
@@ -280,15 +302,13 @@ export class OneCXColumnGroupSelectionComponent
     if (focusedIndex < 0) {
       return
     }
-    const state = this.searchConfigStore.state()
-    const option = select.visibleOptions()[focusedIndex] as { value: string; isPredefined?: boolean } | undefined
-    // Predefined (host column group) leaves are never deletable, even when their key equals a saved
-    // config's name and the config would resolve by name.
-    if (option?.isPredefined) {
-      return
-    }
-    const config = state.searchConfigs.find((c) => c.name === option?.value)
-    if (config && this.canDelete(config)) {
+    // The focused option carries its saved `config` on saved-config leaves and none on predefined (host
+    // column group) leaves, so reading it here makes the keyboard path share the exact deletion rule the
+    // template uses — no re-resolution by name, and predefined leaves can never be deleted even when
+    // their key equals a saved config's name.
+    const option = select.visibleOptions()[focusedIndex] as ColumnGroupSelectOption | undefined
+    const config = option?.config
+    if (this.canDelete(config)) {
       event.preventDefault()
       this.onColumnGroupDelete(config)
     }
