@@ -2021,7 +2021,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     const wideMarker = hostFixture.debugElement.queryAll(
       By.css('.sc-search-config-row .sc-search-config-modified-marker')
     )
-    expect(wideMarker.length).toBe(1)
+    expect(wideMarker).toHaveLength(1)
     expect(wideMarker[0].injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
 
     // The retained header config (Sales) is NOT marked in the column-group select — it is a different
