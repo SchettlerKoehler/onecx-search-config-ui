@@ -116,12 +116,12 @@ describe('search-config.utils', () => {
   })
 
   describe('parseFieldValues', () => {
-    it('should drop falsy values and keep the remaining ones as strings', () => {
+    it('should drop falsy values and keep the remaining ones as strings when parsing field values', () => {
       const parsed = parseFieldValues({ a: '1', empty: '' })
       expect(parsed).toEqual({ a: '1' })
     })
 
-    it('should normalize date values to ISO strings', () => {
+    it('should normalize date values to ISO strings when a value is a date', () => {
       const parsed = parseFieldValues({ date: new Date(Date.UTC(2024, 0, 15, 12, 0, 0)) })
       expect(parsed).toEqual({ date: '2024-01-15T12:00:00.000Z' })
     })
