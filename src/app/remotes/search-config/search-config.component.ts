@@ -3,13 +3,11 @@ import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrat
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
 import {
-  OperatorFunction,
   ReplaySubject,
   Subscription,
   catchError,
   combineLatest,
   debounceTime,
-  filter,
   map,
   mergeMap,
   of,
@@ -106,7 +104,6 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   // The config select, read for the keyboard delete shortcut (see `onSearchConfigSelectKeydown`).
   readonly select = viewChild(Select)
 
-  dataRevertSub: Subscription | undefined
   currentConfigSub: Subscription | undefined
 
   saveAsIcon = PrimeIcons.SAVE
@@ -148,21 +145,6 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
         })
       })
 
-    this.dataRevertSub = this.searchConfigStore.dataToRevert$
-      .pipe(
-        debounceTime(20),
-        filter((data: PageData | undefined) => data !== undefined) as OperatorFunction<PageData | undefined, PageData>
-      )
-      .subscribe((dataToRevert: PageData) => {
-        if (!(dataToRevert.fieldValues && dataToRevert.viewMode)) return
-        this.searchConfigSelected.emit({
-          name: undefined,
-          fieldValues: dataToRevert.fieldValues,
-          displayedColumnsIds: dataToRevert.displayedColumnsIds,
-          viewMode: dataToRevert.viewMode
-        })
-      })
-
     this.currentConfigSub = this.searchConfigStore.currentConfig$
       .pipe(
         debounceTime(50),
@@ -193,7 +175,6 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
   ngOnDestroy(): void {
     this.currentConfigSub?.unsubscribe()
-    this.dataRevertSub?.unsubscribe()
   }
 
   @Input() set ocxRemoteComponentConfig(config: RemoteComponentConfig) {

@@ -5,12 +5,6 @@
 /* portal core */
 @use 'node_modules/@onecx/angular-accelerator/assets/styles.scss';
 
-// fix popover styles, check in next version of primeNG if this is still needed
-.p-popover:before,
-.p-popover:after {
-  right: 1rem !important;
-}
-
 /*
  * Search-config design tokens.
  *
@@ -104,6 +98,71 @@ ocx-search-config-component {
    * rounds the addon's outer (end) corners, joining it to the select's start corners. The addon's
    * default form-field border (top/bottom and the trailing edge) is retinted to the primary button's
    * border color so it blends into the blue Save As button instead of drawing a grey hairline. */
+  .sc-search-config-save-as {
+    height: var(--onecx-search-config-height);
+    --p-inputgroup-addon-border-color: var(--p-button-primary-border-color);
+
+    .p-button {
+      height: 100%;
+    }
+  }
+}
+
+/*
+ * Column-group selector remote: the same joined config select + Save As as the search header, but the
+ * options are grouped ("Predefined" host column groups and "Saved" configs that store columns). The
+ * control reuses the `sc-search-config-*` style hooks and the same design tokens, scoped to this
+ * remote's own host element (ocx-column-group-selection-component) so the two remotes stay independent.
+ * The option-list panel renders inside `<p-select>` (PrimeNG's default `self` appendTo), reached
+ * through the stable `panelStyleClass`; the grouped option headers are styled through the app-owned
+ * group-header token (no PrimeNG token targets the custom `#group` template header).
+ */
+ocx-column-group-selection-component {
+  .sc-search-config-group {
+    width: var(--onecx-search-config-width);
+    --p-inputgroup-addon-border-radius: var(--onecx-search-config-radius);
+  }
+
+  .sc-search-config-select {
+    height: var(--onecx-search-config-height);
+  }
+
+  /* Config-select option list: single-line rows (ellipsis + tooltip) plus the option-group headers. */
+  .sc-search-config-panel {
+    /* Grouped option header ("Predefined" / "Saved"). PrimeNG has no token for the custom `#group`
+     * template header, so the app-owned group-header color drives it. */
+    .sc-search-config-group-header {
+      display: block;
+      color: var(--onecx-search-config-group-header-color);
+    }
+
+    .sc-search-config-row {
+      display: flex;
+      align-items: center;
+      /* Spacing between the group name and its delete affordance. PrimeNG select-list gap token. */
+      gap: var(--p-select-list-gap);
+      width: 100%;
+    }
+
+    .sc-search-config-row-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. The
+     * :root variables drive the button through these scoped PrimeNG danger-token overrides. */
+    .sc-search-config-delete {
+      flex: 0 0 auto;
+      margin: 0;
+      --p-button-text-danger-color: var(--onecx-search-config-delete-color);
+      --p-button-text-danger-hover-background: var(--onecx-search-config-delete-hover-background);
+    }
+  }
+
+  /* Joined Save As addon (filled primary button) — identical treatment to the header remote. */
   .sc-search-config-save-as {
     height: var(--onecx-search-config-height);
     --p-inputgroup-addon-border-color: var(--p-button-primary-border-color);

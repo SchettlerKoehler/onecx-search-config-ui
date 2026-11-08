@@ -375,9 +375,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: false,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -419,9 +417,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'list',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -472,9 +468,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -514,9 +508,7 @@ describe('OneCXSearchConfigComponent', () => {
           selectedGroupKey: 'default',
           isColumnGroupComponentActive: true,
           layout: 'table',
-          currentConfig: undefined,
-          editMode: false,
-          isInChargeOfEdit: false
+          currentConfig: undefined
         } as any)
         tick(500)
 
@@ -562,9 +554,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -615,9 +605,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -667,9 +655,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -723,9 +709,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -780,9 +764,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -839,9 +821,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -954,53 +934,6 @@ describe('OneCXSearchConfigComponent', () => {
       expect(consoleSpy).toHaveBeenCalledWith(error)
       expect(portalMessageSpy.error).toHaveBeenCalledWith({
         summaryKey: 'SEARCH_CONFIG.DELETE_FAILURE'
-      })
-    }))
-  })
-
-  describe('on dataToRevert change', () => {
-    it('should not emit if data does not contain viewMode', fakeAsync(() => {
-      const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
-
-      store.patchState({
-        dataToRevert: {
-          fieldValues: {
-            k: 'v'
-          },
-          viewMode: undefined,
-          displayedColumnsIds: ['col-2'],
-          columnGroupKey: 'default'
-        }
-      })
-
-      tick(500)
-
-      expect(emitterSpy).toHaveBeenCalledTimes(0)
-    }))
-
-    it('should emit the reverted data with an undefined name when field values and view mode are present', fakeAsync(() => {
-      const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
-
-      store.patchState({
-        dataToRevert: {
-          fieldValues: {
-            k: 'v'
-          },
-          viewMode: basicViewMode,
-          displayedColumnsIds: ['col-1'],
-          columnGroupKey: 'default'
-        }
-      })
-
-      tick(500)
-
-      expect(emitterSpy).toHaveBeenCalledWith({
-        name: undefined,
-        fieldValues: {
-          k: 'v'
-        },
-        displayedColumnsIds: ['col-1'],
-        viewMode: basicViewMode
       })
     }))
   })
@@ -1477,37 +1410,6 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await (saveAs as NonNullable<typeof saveAs>).click()
 
     expect(saveSpy).toHaveBeenCalled()
-  })
-
-  it('should disable the config select when the column remote is in edit mode', async () => {
-    await patchConfigs([config])
-    childStore.patchState({
-      editMode: true
-    })
-    await delay(80)
-    hostFixture.detectChanges()
-    await hostFixture.whenStable()
-
-    // The `[disabled]` guard (`vm.searchConfigs.length === 0 || vm.editMode`) forces the select closed
-    // while another remote holds the edit lock, so a picked row can no longer desync from the applied
-    // `currentConfig` (which `setCurrentConfig` ignores in edit mode).
-    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]')
-    expect(combobox.getAttribute('aria-disabled')).toBe('true')
-  })
-
-  it('should disable the Save As button when the column remote is in edit mode', async () => {
-    await patchConfigs([config])
-    childStore.patchState({
-      editMode: true
-    })
-    await delay(80)
-    hostFixture.detectChanges()
-    await hostFixture.whenStable()
-
-    const saveAsButton = hostFixture.nativeElement.querySelector(
-      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
-    ) as HTMLButtonElement
-    expect(saveAsButton.disabled).toBe(true)
   })
 
   it('should delete the focused option when Delete is pressed on the open select combobox', async () => {

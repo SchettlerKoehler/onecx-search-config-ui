@@ -18,7 +18,7 @@
           panelStyleClass="sc-search-config-panel"
           scrollHeight="var(--onecx-search-config-panel-max-height)"
           inputId="sc_search_config_select"
-          [disabled]="vm.searchConfigs.length === 0 || vm.editMode"
+          [disabled]="vm.searchConfigs.length === 0"
           (keydown)="onSearchConfigSelectKeydown($event)"
           [ariaLabelledBy]="'sc_search_config_label'"
           [pt]="
@@ -66,7 +66,6 @@
           [id]="saveAsButtonId"
           [label]="'SEARCH_CONFIG.SAVE_AS.LABEL' | translate"
           [icon]="saveAsIcon"
-          [disabled]="vm.editMode"
           [ariaLabel]="'SEARCH_CONFIG.SAVE_AS.ARIA_LABEL' | translate"
           (onClick)="onSearchConfigSave(vm)"
         ></p-button>

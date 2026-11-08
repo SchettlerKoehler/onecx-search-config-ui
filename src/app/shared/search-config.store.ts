@@ -1,6 +1,6 @@
 import { Inject, Injectable, InjectionToken } from '@angular/core'
 import { ComponentStore } from '@ngrx/component-store'
-import { Observable, filter, tap, withLatestFrom } from 'rxjs'
+import { filter, tap, withLatestFrom } from 'rxjs'
 
 import { Topic } from '@onecx/accelerator'
 
@@ -55,10 +55,6 @@ export type PageData = SearchData & {
 interface SearchConfigComponentState {
   currentSearchConfig: SearchConfigInfo | undefined
   selectedGroupKey: string | undefined
-  inChargeOfEdit: string | undefined
-  editMode: boolean
-  preEditStateSnapshot: SearchConfigState | undefined
-  dataToRevert: PageData | undefined
   searchConfigs: SearchConfigInfo[]
 
   pageName: string | undefined
@@ -69,10 +65,6 @@ interface SearchConfigComponentState {
 interface ColumnGroupSelectionComponentState {
   currentSearchConfig: SearchConfigInfo | undefined
   selectedGroupKey: string | undefined
-  inChargeOfEdit: string | undefined
-  editMode: boolean
-  preEditStateSnapshot: SearchConfigState | undefined
-  dataToRevert: PageData | undefined
   searchConfigs: SearchConfigInfo[]
 
   displayedColumnsIds: Array<string>
@@ -92,9 +84,6 @@ export interface SearchConfigViewModel {
   currentConfig: SearchConfigInfo | undefined
   isColumnGroupComponentActive: boolean
   layout: LayoutType | undefined
-
-  editMode: boolean
-  isInChargeOfEdit: boolean
 }
 
 export interface ColumnSelectionViewModel {
@@ -107,9 +96,6 @@ export interface ColumnSelectionViewModel {
   selectedGroupKey: string | undefined
   currentConfig: SearchConfigInfo | undefined
   layout: LayoutType | undefined
-
-  editMode: boolean
-  isInChargeOfEdit: boolean
 }
 
 export const SEARCH_CONFIG_STORE_NAME = new InjectionToken<string>('searchConfigStoreName')
@@ -127,11 +113,6 @@ export const initialState: SearchConfigState = {
   searchConfigs: [],
   currentSearchConfig: undefined,
   selectedGroupKey: undefined,
-
-  inChargeOfEdit: '',
-  editMode: false,
-  preEditStateSnapshot: undefined,
-  dataToRevert: undefined,
 
   displayedSearchData: undefined,
 
@@ -239,8 +220,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   })
 
   readonly setCurrentConfig = this.updater((state, config: SearchConfigInfo | undefined) => {
-    if (state.editMode) return state
-
     const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, config)
 
     const stateToUpdate: Partial<SearchConfigState> = {
@@ -253,17 +232,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     return { ...state, ...stateToUpdate }
   })
 
-  readonly editSearchConfig = this.updater((state, searchConfig: SearchConfigInfo) => {
-    const stateToUpdate: Partial<SearchConfigState> = {
-      searchConfigs: state.searchConfigs.map((config) => (config.id === searchConfig.id ? searchConfig : config))
-    }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
   readonly setSelectedGroupKey = this.updater((state, selectedGroupKey: string) => {
-    if (state.editMode) return state
-
     const currentConfig = this.updateConfigBySelectedGroupKey(state, selectedGroupKey)
 
     const stateToUpdate: Partial<SearchConfigState> = {
@@ -272,107 +241,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       }),
       selectedGroupKey: selectedGroupKey
     }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  readonly setEditMode = this.updater((state) => {
-    const stateToUpdate: Partial<SearchConfigState> = {
-      editMode: true,
-      inChargeOfEdit: this.storeName,
-      dataToRevert: undefined
-    }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  readonly cancelEditMode = this.updater((state) => {
-    const stateToUpdate: Partial<SearchConfigState> = {
-      editMode: false,
-      inChargeOfEdit: ''
-    }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  readonly takeSnapshot = this.updater((state) => {
-    const stateToUpdate: Partial<SearchConfigState> = {
-      preEditStateSnapshot: state
-    }
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  readonly revertData = this.updater((state) => {
-    if (!state.preEditStateSnapshot) return state
-
-    let stateToUpdate: Partial<SearchConfigState> = {}
-
-    const savedConfig = state.preEditStateSnapshot.currentSearchConfig
-
-    if (!savedConfig) {
-      stateToUpdate = {
-        dataToRevert: {
-          fieldValues: state.preEditStateSnapshot.fieldValues ?? {},
-          displayedColumnsIds: state.preEditStateSnapshot.displayedColumnsIds,
-          viewMode: state.preEditStateSnapshot.viewMode ?? basicViewMode,
-          columnGroupKey: state.preEditStateSnapshot.selectedGroupKey ?? ''
-        },
-        currentSearchConfig: undefined,
-        selectedGroupKey: state.preEditStateSnapshot.selectedGroupKey
-      }
-    } else if (hasOnlyColumns(savedConfig)) {
-      stateToUpdate = {
-        dataToRevert: {
-          fieldValues: state.preEditStateSnapshot.fieldValues ?? {},
-          displayedColumnsIds: savedConfig.columns,
-          viewMode: state.preEditStateSnapshot.viewMode ?? basicViewMode,
-          columnGroupKey: savedConfig.name
-        },
-        currentSearchConfig: savedConfig,
-        selectedGroupKey: savedConfig.name
-      }
-    } else if (hasOnlyValues(savedConfig)) {
-      stateToUpdate = {
-        dataToRevert: {
-          fieldValues: savedConfig.values,
-          displayedColumnsIds: state.preEditStateSnapshot.displayedColumnsIds,
-          viewMode: savedConfig.isAdvanced ? advancedViewMode : basicViewMode,
-          columnGroupKey: state.preEditStateSnapshot.selectedGroupKey ?? ''
-        },
-        currentSearchConfig: savedConfig,
-        selectedGroupKey: state.preEditStateSnapshot.selectedGroupKey
-      }
-    } else {
-      stateToUpdate = {
-        dataToRevert: {
-          fieldValues: savedConfig.values,
-          displayedColumnsIds: state.columnGroupComponentActive
-            ? savedConfig.columns
-            : state.preEditStateSnapshot.displayedColumnsIds,
-          viewMode: savedConfig.isAdvanced ? advancedViewMode : basicViewMode,
-          columnGroupKey: savedConfig.name
-        },
-        currentSearchConfig: savedConfig,
-        selectedGroupKey: savedConfig.name
-      }
-    }
-
-    stateToUpdate = {
-      ...stateToUpdate,
-      displayedSearchData: this.buildDisplayedSearchData(stateToUpdate.dataToRevert, state.displayedSearchData)
-    }
-
-    this.sendUpdateMessage(stateToUpdate, state)
-    return { ...state, ...stateToUpdate }
-  })
-
-  readonly activateEditedConfig = this.updater((state, config: SearchConfigInfo) => {
-    const stateToUpdate: Partial<SearchConfigState> = {
-      currentSearchConfig: config,
-      selectedGroupKey: hasColumns(config) ? config.name : state.customGroupKey
-    }
-
     this.sendUpdateMessage(stateToUpdate, state)
     return { ...state, ...stateToUpdate }
   })
@@ -493,12 +361,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     ({ columnGroupComponentActive }): boolean => columnGroupComponentActive
   )
 
-  readonly preEditStateSnapshot$ = this.select(({ preEditStateSnapshot }) => preEditStateSnapshot).pipe(
-    filter(this.isNotUndefined)
-  )
-
-  readonly dataToRevert$ = this.select(({ dataToRevert }) => dataToRevert).pipe(filter(this.isNotUndefined))
-
   readonly pageName$ = this.select(this.state$, (state) => state.pageName).pipe(filter(this.isNotUndefined))
 
   readonly selectedGroupKey$ = this.select(({ selectedGroupKey }) => selectedGroupKey).pipe(filter(this.isNotUndefined))
@@ -521,8 +383,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     this.currentConfig$,
     (state, currentConfig): SearchConfigViewModel => ({
       searchConfigs: state.searchConfigs.filter((config) => hasValues(config)),
-      editMode: state.editMode,
-      isInChargeOfEdit: state.inChargeOfEdit === this.storeName,
       currentConfig: currentConfig,
       isColumnGroupComponentActive: state.columnGroupComponentActive,
       layout: state.layout
@@ -547,44 +407,12 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
         selectedGroupKey: state.selectedGroupKey,
         currentConfig: currentConfig,
         customGroupKey: state.customGroupKey,
-        editMode: state.editMode,
-        isInChargeOfEdit: state.inChargeOfEdit === this.storeName,
         layout: state.layout
       }
     }
   )
 
   // *********** Effects *********** //
-
-  readonly enterEditMode = this.effect((config$: Observable<SearchConfigInfo>) => {
-    return config$.pipe(
-      tap((config) => {
-        this.takeSnapshot()
-        this.setCurrentConfig(config)
-        this.setEditMode()
-      })
-    )
-  })
-
-  readonly cancelEdit = this.effect((trigger$) => {
-    return trigger$.pipe(
-      tap(() => {
-        this.revertData()
-        this.cancelEditMode()
-      })
-    )
-  })
-
-  readonly saveEdit = this.effect((config$: Observable<SearchConfigInfo>) => {
-    return config$.pipe(
-      withLatestFrom(this.state$),
-      tap(([config, state]) => {
-        this.editSearchConfig(config)
-        this.cancelEditMode()
-        this.activateEditedConfig(config)
-      })
-    )
-  })
 
   private readonly storeUpdate = this.effect(() => {
     return this.searchConfigTopic$.pipe(
@@ -695,23 +523,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       .catch((err) => console.error(err))
   }
 
-  private buildDisplayedSearchData(
-    dataToRevert: PageData | undefined,
-    displayedSearchData: SearchData | undefined
-  ): SearchData {
-    const fallbackDisplayedSearchData = displayedSearchData ?? {
-      fieldValues: {},
-      displayedColumnsIds: [],
-      viewMode: basicViewMode
-    }
-
-    return {
-      fieldValues: dataToRevert?.fieldValues ?? fallbackDisplayedSearchData.fieldValues ?? {},
-      displayedColumnsIds: dataToRevert?.displayedColumnsIds ?? fallbackDisplayedSearchData.displayedColumnsIds ?? [],
-      viewMode: dataToRevert?.viewMode ?? fallbackDisplayedSearchData.viewMode ?? basicViewMode
-    }
-  }
-
   private isCurrentConfigOutdated(
     state: SearchConfigState,
     change: {
@@ -721,8 +532,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       layout?: 'table' | 'grid' | 'list'
     }
   ) {
-    if (state.editMode) return false
-
     if (state.currentSearchConfig === undefined) return true
 
     if (
@@ -757,7 +566,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
    */
   private updateSelectedGroupKeyByConfig(state: SearchConfigState, config: SearchConfigInfo | undefined) {
     if (!state.columnGroupComponentActive) return state.selectedGroupKey
-    if (state.editMode) return state.selectedGroupKey
 
     if (config && config.name === state.selectedGroupKey) return state.selectedGroupKey
 
@@ -783,7 +591,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     selectedGroupKey: string
   ): SearchConfigInfo | undefined {
     if (!state.searchConfigComponentActive) return state.currentSearchConfig
-    if (state.editMode) return state.currentSearchConfig
 
     const searchConfigForSelectedKey = state.searchConfigs.some((c) => c.name === state.selectedGroupKey)
 
