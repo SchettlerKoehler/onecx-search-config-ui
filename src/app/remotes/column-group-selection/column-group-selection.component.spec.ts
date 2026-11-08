@@ -239,6 +239,15 @@ describe('OneCXColumnGroupSelectionComponent', () => {
     expect(spy).toHaveBeenCalledWith('grid')
   }))
 
+  it('should update store on page name input set', fakeAsync(() => {
+    const spy = jest.spyOn(store, 'setPageName')
+
+    component.pageName = 'my-page'
+    tick(500)
+
+    expect(spy).toHaveBeenCalledWith('my-page')
+  }))
+
   describe('setup', () => {
     it('should init remote component', (done) => {
       const config: RemoteComponentConfig = {
@@ -734,7 +743,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         } as any)
       )
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [config], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(dialogServiceSpy).toHaveBeenCalledWith(
@@ -782,7 +791,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         } as any)
       )
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [config], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(createCallSpy).toHaveBeenCalledWith({
@@ -830,7 +839,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         } as any)
       )
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(portalMessageSpy.info).toHaveBeenCalledWith({
@@ -866,7 +875,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         } as any)
       )
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
@@ -892,7 +901,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
       jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(of({ result: undefined, button: 'primary' } as any))
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(addSpy).toHaveBeenCalledTimes(0)
@@ -928,7 +937,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       )
       jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(throwError(() => error))
 
-      component.onColumnGroupSaveAs({ searchConfigsWithColumns: [], customGroupKey: 'custom' } as any)
+      component.onColumnGroupSaveAs()
       tick(500)
 
       expect(portalMessageSpy.error).toHaveBeenCalledWith({

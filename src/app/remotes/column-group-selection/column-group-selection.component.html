@@ -33,7 +33,8 @@
               <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
                 item.label
               }}</span>
-              @if (!item.isPredefined && canDelete(getConfigByName(vm, item.value))) {
+              @let savedConfig = getConfigByName(vm, item.value);
+              @if (!item.isPredefined && canDelete(savedConfig)) {
                 <p-button
                   class="sc-search-config-delete"
                   [icon]="deleteIcon"
@@ -41,7 +42,7 @@
                   severity="danger"
                   [tabindex]="-1"
                   aria-hidden="true"
-                  (click)="onColumnGroupDelete(getConfigByName(vm, item.value)); $event.stopPropagation()"
+                  (click)="onColumnGroupDelete(savedConfig); $event.stopPropagation()"
                 ></p-button>
               }
             </div>
@@ -65,7 +66,7 @@
           [label]="'COLUMN_GROUP_SELECTION.SAVE_AS.LABEL' | translate"
           [icon]="saveAsIcon"
           [ariaLabel]="'COLUMN_GROUP_SELECTION.SAVE_AS.ARIA_LABEL' | translate"
-          (onClick)="onColumnGroupSaveAs(vm)"
+          (onClick)="onColumnGroupSaveAs()"
         ></p-button>
       </p-inputgroup-addon>
     </p-inputgroup>

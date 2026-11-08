@@ -112,6 +112,12 @@ export class OneCXColumnGroupSelectionComponent
     })
   }
 
+  @Input() set pageName(pageName: string) {
+    setTimeout(() => {
+      this.searchConfigStore.setPageName(pageName)
+    })
+  }
+
   @Input() groupSelectionChanged: EventEmitter<ColumnGroupData> = new EventEmitter()
 
   columns$ = new BehaviorSubject<DataTableColumn[]>([])
@@ -285,14 +291,14 @@ export class OneCXColumnGroupSelectionComponent
     })
   }
 
-  private getConfigByName(vm: ColumnSelectionViewModel, key: string): SearchConfigInfo | undefined {
+  protected getConfigByName(vm: ColumnSelectionViewModel, key: string): SearchConfigInfo | undefined {
     return vm.searchConfigsWithColumns.find((c) => c.name === key)
   }
 
   // Whether the given (saved config) row renders a delete affordance: the SEARCHCONFIG#DELETE
   // permission plus the read-only flag. Predefined group rows resolve to no config and are never
   // deletable.
-  canDelete(config: SearchConfigInfo | undefined): boolean {
+  canDelete(config: SearchConfigInfo | undefined): config is SearchConfigInfo {
     return !!config && this.permissions.includes('SEARCHCONFIG#DELETE') && !config.isReadonly
   }
 
@@ -353,7 +359,7 @@ export class OneCXColumnGroupSelectionComponent
   // Save As saves a NEW config that stores the currently displayed columns (never the input values):
   // the create dialog is opened with `saveColumns` pre-selected. The column option is not frozen — the
   // full save-options rework (freeze semantics) lands in #962.
-  onColumnGroupSaveAs(vm: ColumnSelectionViewModel) {
+  onColumnGroupSaveAs() {
     this.portalDialogService
       .openDialog<CreateOrEditSearchDialogContent>(
         'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_HEADER',
