@@ -109,6 +109,14 @@ export interface ColumnSelectionViewModel {
   currentConfig: SearchConfigInfo | undefined
   /** True when the current config is retained but a stored aspect no longer matches the page. */
   currentConfigModified: boolean
+  /**
+   * True when the saved config the select points at (`selectedGroupKey`) is retained but a stored
+   * aspect no longer matches the page — the config the `*` marker and the "Modified" tooltip in the
+   * column-group select refer to. This is the select's selection, not the header's current config:
+   * when the two differ (the "Sales" criteria + a "Wide" column group example) the header marks the
+   * retained current config while the column-group select marks the selected one.
+   */
+  selectedConfigModified: boolean
   /** The grouped options for the config select, with each saved config attached to its leaf. */
   options: Array<{ label: string; value: string; items: ColumnGroupSelectOption[] }>
 }
@@ -390,17 +398,23 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   // reflected without any store round-trip.
   readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
     const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
+    const pageData = {
+      fieldValues: state.fieldValues,
+      viewMode: state.viewMode,
+      displayedColumnsIds: state.displayedColumnsIds
+    }
+    // The config the select points at (`selectedGroupKey`), not the header's current config: when the
+    // two differ the column-group select marks the selection it shows, the header marks the retained
+    // current config. Predefined/custom keys resolve to no config and are therefore never modified.
+    const selectedConfig = searchConfigsWithColumns.find((config) => config.name === state.selectedGroupKey)
     return {
       searchConfigsWithColumns: searchConfigsWithColumns,
       nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
       selectedGroupKey: state.selectedGroupKey,
       customGroupKey: state.customGroupKey,
       currentConfig: state.currentSearchConfig,
-      currentConfigModified: isSearchConfigModified(state.currentSearchConfig, {
-        fieldValues: state.fieldValues,
-        viewMode: state.viewMode,
-        displayedColumnsIds: state.displayedColumnsIds
-      }),
+      currentConfigModified: isSearchConfigModified(state.currentSearchConfig, pageData),
+      selectedConfigModified: isSearchConfigModified(selectedConfig, pageData),
       options: [
         {
           label: 'COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED',

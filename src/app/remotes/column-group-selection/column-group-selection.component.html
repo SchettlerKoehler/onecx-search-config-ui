@@ -32,14 +32,14 @@
               <span
                 class="sc-search-config-row-name"
                 [pTooltip]="
-                  item.config && item.config === vm.currentConfig && vm.currentConfigModified
+                  item.value === vm.selectedGroupKey && vm.selectedConfigModified
                     ? ('SEARCH_CONFIG.SELECT.MODIFIED' | translate)
                     : item.label
                 "
                 [showOnEllipsis]="true"
                 >{{ item.label }}</span
               >
-              @if (item.config && item.config === vm.currentConfig && vm.currentConfigModified) {
+              @if (item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
                 <span class="sc-search-config-modified-marker">*</span>
               }
               @if (canDelete(item.config)) {
@@ -58,14 +58,14 @@
           <ng-template #selectedItem let-item>
             <span
               [pTooltip]="
-                item.config && item.config === vm.currentConfig && vm.currentConfigModified
+                item.value === vm.selectedGroupKey && vm.selectedConfigModified
                   ? ('SEARCH_CONFIG.SELECT.MODIFIED' | translate)
                   : undefined
               "
               [showOnEllipsis]="true"
               >{{ item.label }}</span
             >
-            @if (item.config && item.config === vm.currentConfig && vm.currentConfigModified) {
+            @if (item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
               <span class="sc-search-config-modified-marker">*</span>
             }
           </ng-template>
