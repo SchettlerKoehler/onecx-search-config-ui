@@ -298,6 +298,21 @@ describe('OneCXColumnGroupSelectionComponent', () => {
 
       expect(setSelectedGroupKeySpy).toHaveBeenCalledWith('custom')
     }))
+
+    it('should ignore a column with no predefinedGroupKeys when deriving the predefined group keys', fakeAsync(() => {
+      const setNonSearchConfigGroupKeysSpy = jest.spyOn(store, 'setNonSearchConfigGroupKeys')
+
+      // The first column declares no `predefinedGroupKeys` (undefined) — the `|| []` fallback (L194) —
+      // while the second declares keys; the surviving keys plus the default group are what remain.
+      component.columns = [{ id: 'col-a' } as any, { id: 'col-b', predefinedGroupKeys: ['custom', 'default'] } as any]
+
+      component.ngOnInit()
+      tick(100)
+
+      // The undefined keys contribute nothing (`|| []`), so only the surviving keys remain (the empty
+      // `defaultGroupKey` is filtered out by `!!value`).
+      expect(setNonSearchConfigGroupKeysSpy).toHaveBeenCalledWith(['custom', 'default'])
+    }))
   })
 
   describe('on destroy', () => {
@@ -492,6 +507,54 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         activeColumns: [],
         groupKey: 'default'
       })
+    }))
+
+    it('should not emit when selectedGroupKey is neither a stored config, the custom group nor a predefined group', fakeAsync(() => {
+      const selectedGroupKey$ = new Subject<string>()
+      const vm$ = new BehaviorSubject<any>({
+        searchConfigsWithColumns: [],
+        customGroupKey: 'custom',
+        nonSearchConfigGroupKeys: ['default', 'full'],
+        selectedGroupKey: 'other'
+      })
+      const fakeStore = {
+        pageName$: of('page-name'),
+        selectedGroupKey$,
+        columnSelectionVm$: vm$,
+        searchConfigs: [],
+        state: () => ({ searchConfigs: [] }),
+        setSelectedGroupKey: jest.fn(),
+        setCustomGroupKey: jest.fn(),
+        updateDisplayedColumnsIds: jest.fn(),
+        updateLayout: jest.fn(),
+        setNonSearchConfigGroupKeys: jest.fn()
+      } as any
+
+      // Construct through the injection context so the field-level `viewChild(Select)` initializer
+      // (valid in production because Angular creates the component in its DI context) works here too.
+      const fakeComponent = runInInjectionContext(
+        TestBed.inject(Injector),
+        () =>
+          new OneCXColumnGroupSelectionComponent(
+            new ReplaySubject<RemoteComponentConfig>(1),
+            { lang$: new BehaviorSubject('en') } as any,
+            { use: jest.fn() } as any,
+            { configuration: new Configuration({ basePath: '' }) } as any,
+            { openDialog: jest.fn() } as any,
+            { info: jest.fn(), success: jest.fn(), error: jest.fn() } as any,
+            { currentMfe$: { asObservable: () => of({ appId: 'appId', productName: 'product' } as any) } } as any,
+            fakeStore
+          )
+      )
+      fakeComponent.columns = [{ id: 'col-1' } as any, { id: 'col-2' } as any]
+      const emitterSpy = jest.spyOn(fakeComponent.groupSelectionChanged, 'emit')
+
+      // `'other'` is not a config-with-columns, is not the custom group and is not in
+      // `nonSearchConfigGroupKeys`, so the `else if` (L175) is skipped and nothing is emitted.
+      selectedGroupKey$.next('other')
+      tick(60)
+
+      expect(emitterSpy).not.toHaveBeenCalled()
     }))
   })
 
@@ -803,6 +866,141 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         name: config.name,
         isAdvanced: false,
         columns: ['my-col', 'my-col2'],
+        values: {}
+      })
+    }))
+
+    it('should save the parsed input values and the advanced flag when the dialog result keeps the input values', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+      const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
+      store.patchState({
+        searchConfigs: [config],
+        pageName: 'my-page',
+        fieldValues: { k1: 'v1', empty: '' },
+        displayedColumnsIds: ['my-col'],
+        viewMode: advancedViewMode
+      })
+      // The dialog result keeps `saveInputValues: true` (unlike the columns-only Seed path), so the
+      // request maps `isAdvanced` from the advanced view mode (L424) and `values` from the parsed
+      // field values (L426); `parseFieldValues` drops the empty value.
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            searchConfigName: config.name,
+            saveInputValues: true,
+            saveColumns: true
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onColumnGroupSaveAs()
+      tick(500)
+
+      expect(createCallSpy).toHaveBeenCalledWith({
+        appId: 'my-app',
+        productName: 'my-product',
+        fieldListVersion: 0,
+        isReadonly: false,
+        page: 'my-page',
+        name: config.name,
+        isAdvanced: true,
+        columns: ['my-col'],
+        values: { k1: 'v1' }
+      })
+    }))
+
+    it('should fall back to an empty name when the dialog result omits the config name', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+      const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
+      store.patchState({
+        searchConfigs: [config],
+        pageName: 'my-page',
+        fieldValues: {},
+        displayedColumnsIds: ['my-col'],
+        viewMode: basicViewMode
+      })
+      // The dialog result carries no `searchConfigName`, so the request's `name` falls back to `''`
+      // via `?? ''` (L423) rather than `undefined`.
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            saveInputValues: false,
+            saveColumns: true
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onColumnGroupSaveAs()
+      tick(500)
+
+      expect(createCallSpy).toHaveBeenCalledWith({
+        appId: 'my-app',
+        productName: 'my-product',
+        fieldListVersion: 0,
+        isReadonly: false,
+        page: 'my-page',
+        name: '',
+        isAdvanced: false,
+        columns: ['my-col'],
+        values: {}
+      })
+    }))
+
+    it('should map empty values when the input values are saved but no field values are present', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+      const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
+      store.patchState({
+        searchConfigs: [config],
+        pageName: 'my-page',
+        fieldValues: undefined,
+        displayedColumnsIds: ['my-col'],
+        viewMode: basicViewMode
+      })
+      // `saveInputValues: true` but `fieldValues` is undefined, so `data.fieldValues ?? {}` falls back
+      // to `{}` (L426) and `parseFieldValues` yields no values.
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            searchConfigName: config.name,
+            saveInputValues: true,
+            saveColumns: true
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onColumnGroupSaveAs()
+      tick(500)
+
+      expect(createCallSpy).toHaveBeenCalledWith({
+        appId: 'my-app',
+        productName: 'my-product',
+        fieldListVersion: 0,
+        isReadonly: false,
+        page: 'my-page',
+        name: config.name,
+        isAdvanced: false,
+        columns: ['my-col'],
         values: {}
       })
     }))
@@ -1399,6 +1597,81 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
     await hostFixture.whenStable()
     expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when a non-Delete key is pressed on the open combobox', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onColumnGroupDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    expect(select.overlayVisible).toBe(true)
+
+    // A key other than `Delete` (here `Backspace`) is filtered by the `event.code !== 'Delete'` guard
+    // (L316-317) and returns early, so no delete is triggered even on the open combobox.
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backspace', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when Delete is pressed inside the filter input', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([config])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onColumnGroupDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    // Open the panel and focus an option. With `[filter]="true"`, PrimeNG focuses the filter input,
+    // and its keydown bubbles up to the `p-select` host, so a real Delete on the filter input must not
+    // trigger the delete shortcut (the `event.target !== focusInputViewChild` guard, L321-322).
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', bubbles: true }))
+    await hostFixture.whenStable()
+    expect(select.focusedOptionIndex()).toBeGreaterThanOrEqual(0)
+
+    const filterInput = hostFixture.nativeElement.querySelector('p-select input[role="searchbox"]') as HTMLElement
+    expect(filterInput).toBeTruthy()
+    filterInput.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete via the keyboard path when the focused saved config is read-only', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+
+    await patchConfigs([readonlyConfig])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onColumnGroupDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    // Focus the read-only saved-config leaf and press Delete on the combobox: the config resolves (the
+    // `config &&` side is truthy) but `canDelete(config)` is false (read-only), so the delete is a no-op
+    // and the browser default is not consumed — the `canDelete`-false branch of L336.
+    const visibleOptions = select.visibleOptions() as any[]
+    const readonlyIndex = visibleOptions.findIndex((option) => option?.value === readonlyConfig.name)
+    expect(readonlyIndex).toBeGreaterThanOrEqual(0)
+    select.focusedOptionIndex.set(readonlyIndex)
+
+    const deleteEvent = new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true })
+    combobox.dispatchEvent(deleteEvent)
+    await hostFixture.whenStable()
+
+    expect(deleteSpy).not.toHaveBeenCalled()
+    expect(deleteEvent.defaultPrevented).toBe(false)
   })
 
   it('should reject getRowByName when no row matches the given name', async () => {
