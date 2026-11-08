@@ -967,10 +967,9 @@ describe('OneCXSearchConfigComponent', () => {
       })
       expect(localStore.state().currentSearchConfig).toBe(config)
 
-      // Diverging the page's field values no longer deselects the config (#961): the selection is
-      // retained and the mismatch surfaces as the derived `modified` flag, not a re-emission —
-      // `currentConfig$` only fires on a selection change, so a criteria divergence produces no new
-      // emission (the host keeps the config's stored data).
+      // A criteria divergence produces no new emission: `currentConfig$` only fires on a selection
+      // change, so the retained config's mismatch surfaces as the derived `modified` flag rather than
+      // a re-emission — the host keeps the config's stored data.
       emitterSpy.mockClear()
       localComponent.currentFieldValues = { k1: 'v_2' }
       tick(500)
