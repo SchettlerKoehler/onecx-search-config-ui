@@ -65,8 +65,6 @@ const createSpyObj = (baseName: string, methodNames: Array<string>): { [key: str
   return obj
 }
 
-const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
 const config = {
   id: '1',
   name: 'config-1',
@@ -1574,15 +1572,43 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
   // (`ngOnInit` → `setNonSearchConfigGroupKeys`), so the predefined keys are driven through the
   // component's real pipeline (one column carrying the keys) rather than patched into the store
   // directly — a direct patch would be clobbered by that pipeline once the (empty) `columns` resolve.
+  // These specs run against a real DOM (PrimeNG overlays, `TestbedHarnessEnvironment`) and cannot
+  // use `fakeAsync`, so the debounced `vm$` is flushed with a bounded real-time pump instead of a
+  // blind `delay(80)`: `detectChanges()` re-renders on a short tick while `vm$` (a 50 ms
+  // `debounceTime`) settles, until two consecutive ticks observe the same emitted view model (the
+  // debounce has fired and no further state change is pending), then a final `detectChanges()` and
+  // `whenStable()` follow. Waiting on the emitted value — not a fixed sleep — is what removes the
+  // wall-clock race between the old `delay(80)` and `debounceTime(50)`.
+  const settle = async () => {
+    const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+    let last: any
+    const sub = childComponent.vm$.subscribe((vm) => (last = vm))
+    try {
+      let previous: any
+      let settled = false
+      for (let i = 0; i < 100 && !settled; i++) {
+        hostFixture.detectChanges()
+        await realSleep(10)
+        if (last !== undefined && last === previous) {
+          settled = true
+        } else {
+          previous = last
+        }
+      }
+      hostFixture.detectChanges()
+      await hostFixture.whenStable()
+    } finally {
+      sub.unsubscribe()
+    }
+  }
+
   const patchConfigs = async (configs: any[], predefinedGroupKeys: string[] = []) => {
     childComponent.columns = predefinedGroupKeys.length > 0 ? [{ id: 'col', predefinedGroupKeys } as any] : ([] as any)
     childStore.patchState({
       searchConfigs: configs
     })
     hostFixture.detectChanges()
-    await delay(80)
-    hostFixture.detectChanges()
-    await hostFixture.whenStable()
+    await settle()
   }
 
   const openItems = async () => (await harness()).getSelectItems()
