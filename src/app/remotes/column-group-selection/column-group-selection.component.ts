@@ -11,18 +11,7 @@ import {
 } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import {
-  BehaviorSubject,
-  combineLatest,
-  ReplaySubject,
-  Subscription,
-  catchError,
-  debounceTime,
-  map,
-  mergeMap,
-  of,
-  withLatestFrom
-} from 'rxjs'
+import { BehaviorSubject, ReplaySubject, Subscription, debounceTime, map, withLatestFrom } from 'rxjs'
 
 import { PrimeIcons } from 'primeng/api'
 import { ButtonModule } from 'primeng/button'
@@ -32,6 +21,7 @@ import { InputGroupModule } from 'primeng/inputgroup'
 import { Select, SelectModule } from 'primeng/select'
 import { TooltipModule } from 'primeng/tooltip'
 
+import { getLocation } from '@onecx/accelerator'
 import {
   AngularAcceleratorModule,
   ColumnGroupData,
@@ -39,7 +29,6 @@ import {
   PortalDialogService
 } from '@onecx/angular-accelerator'
 import { AppStateService, PortalMessageService, UserService } from '@onecx/angular-integration-interface'
-import { MfeInfo } from '@onecx/integration-interface'
 import {
   AngularRemoteComponentsModule,
   ocxRemoteComponent,
@@ -47,21 +36,16 @@ import {
 } from '@onecx/angular-remote-components'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 
-import {
-  Configuration,
-  CreateSearchConfigRequest,
-  SearchConfigAPIService,
-  SearchConfigInfo
-} from 'src/app/shared/generated'
+import { Configuration, SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
 import { environment } from 'src/environments/environment'
-import { ColumnSelectionViewModel, PageData, SearchConfigStore } from 'src/app/shared/search-config.store'
-import {
-  CreateOrEditSearchConfigDialogComponent,
-  CreateOrEditSearchDialogContent
-} from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
-import { advancedViewMode, SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
-import { parseFieldValues } from 'src/app/shared/search-config.utils'
+import { ColumnSelectionViewModel, SearchConfigStore } from 'src/app/shared/search-config.store'
+import { COLUMN_GROUP_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
+import {
+  createSearchConfig,
+  loadSearchConfigInfos,
+  resolveStandalonePageName
+} from 'src/app/shared/search-config-create'
 
 @Component({
   selector: 'app-ocx-column-group-selection',
@@ -141,7 +125,7 @@ export class OneCXColumnGroupSelectionComponent
 
   saveAsIcon = PrimeIcons.SAVE
   deleteIcon = PrimeIcons.TRASH
-  saveAsButtonId = SEARCH_CONFIG_SAVE_AS_BUTTON_ID
+  saveAsButtonId = COLUMN_GROUP_SAVE_AS_BUTTON_ID
 
   permissions: string[] = []
 
@@ -218,54 +202,28 @@ export class OneCXColumnGroupSelectionComponent
     this.permissions = config.permissions
   }
 
-  // Load the saved configs the same way the search header remote does: once the remote base url,
-  // the store's page name and the current MFE are all available.
-  private loadSearchConfigs(): void {
-    combineLatest([this.baseUrl, this.searchConfigStore.pageName$, this.appStateService.currentMfe$.asObservable()])
-      .pipe(
-        mergeMap(([_, pageName, currentMfe]) => {
-          return this.searchConfigService
-            .getSearchConfigInfos({
-              appId: currentMfe.appId,
-              page: pageName,
-              productName: currentMfe.productName
-            })
-            .pipe(map((response) => response.configs))
-        })
-      )
-      .subscribe((searchConfigs) => {
-        setTimeout(() => {
-          this.searchConfigStore.setSearchConfigs(searchConfigs)
-        })
-      })
+  // The page name for this remote's own requests: the store's `pageName` once it is defined (a
+  // header-provided page name always wins), otherwise a fallback derived from the application path.
+  private resolvePageName() {
+    return resolveStandalonePageName(this.searchConfigStore, getLocation().applicationPath)
   }
 
-  // Grouped options for the config select: the host-provided predefined column groups (never
-  // deletable) plus the saved configs that store columns. Predefined items carry `isPredefined` so the
-  // template and the keyboard delete path can tell them apart from saved items even when a predefined
-  // key equals a saved config's name (a name-only lookup would then resolve the predefined row to the
-  // saved config).
-  getOptions(vm: ColumnSelectionViewModel) {
-    return [
-      {
-        label: this.translateService.instant('COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED'),
-        value: 'predefined',
-        items: vm.nonSearchConfigGroupKeys.map((key) => ({
-          label: this.translateService.instant(key),
-          value: key,
-          isPredefined: true
-        }))
-      },
-      {
-        label: this.translateService.instant('COLUMN_GROUP_SELECTION.GROUPS.SAVED'),
-        value: 'saved',
-        items: vm.searchConfigsWithColumns.map((config) => ({
-          label: config.name,
-          value: config.name,
-          isReadonly: config.isReadonly
-        }))
-      }
-    ]
+  // Load the saved configs once the remote base url, the page name and the current MFE are all
+  // available. The load is skipped while the search header remote is active so only one of the two
+  // remotes performs the (same) GET.
+  private loadSearchConfigs(): void {
+    loadSearchConfigInfos(
+      this.baseUrl,
+      this.appStateService,
+      this.searchConfigService,
+      this.portalMessageService,
+      this.resolvePageName(),
+      this.searchConfigStore.isSearchConfigComponentActive$.pipe(map((active) => !active))
+    ).subscribe((searchConfigs) => {
+      setTimeout(() => {
+        this.searchConfigStore.setSearchConfigs(searchConfigs)
+      })
+    })
   }
 
   // Whether the grouped config select has any selectable option: a host predefined column group or
@@ -276,10 +234,11 @@ export class OneCXColumnGroupSelectionComponent
     return vm.nonSearchConfigGroupKeys.length > 0 || vm.searchConfigsWithColumns.length > 0
   }
 
-  // The select's label shows the host-provided placeholder while nothing is selected and the fixed
-  // "Column group" label once a group or config has been picked.
+  // The select's label shows the host-provided placeholder while nothing (or the host custom group)
+  // is selected and the fixed "Column group" label once a predefined group or a saved config has been
+  // picked.
   selectLabel(vm: ColumnSelectionViewModel): string {
-    if (!vm.selectedGroupKey) {
+    if (!vm.selectedGroupKey || (vm.customGroupKey && vm.selectedGroupKey === vm.customGroupKey)) {
       return this.placeholderKey || 'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
     }
     return 'COLUMN_GROUP_SELECTION.LABEL'
@@ -289,10 +248,6 @@ export class OneCXColumnGroupSelectionComponent
     setTimeout(() => {
       this.searchConfigStore.setSelectedGroupKey(key)
     })
-  }
-
-  protected getConfigByName(vm: ColumnSelectionViewModel, key: string): SearchConfigInfo | undefined {
-    return vm.searchConfigsWithColumns.find((c) => c.name === key)
   }
 
   // Whether the given (saved config) row renders a delete affordance: the SEARCHCONFIG#DELETE
@@ -358,81 +313,36 @@ export class OneCXColumnGroupSelectionComponent
 
   // Save As saves a NEW config that stores the currently displayed columns (never the input values):
   // the create dialog is opened with `saveColumns` pre-selected. The column option is not frozen — the
-  // full save-options rework (freeze semantics) lands in #962.
+  // full save-options rework (freeze semantics) lands in #962. The dialog, request and toasts live in
+  // the shared `createSearchConfig` helper (so both remotes open the same dialog); on success we just
+  // add the created config to the store and select it.
   onColumnGroupSaveAs() {
-    this.portalDialogService
-      .openDialog<CreateOrEditSearchDialogContent>(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: '',
-            saveInputValues: false,
-            saveColumns: true,
-            frozeColumnSaveOption: false
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-      .pipe(
-        withLatestFrom(
-          this.appStateService.currentMfe$.asObservable(),
-          this.searchConfigStore.currentPageData$,
-          this.searchConfigStore.pageName$
-        ),
-        mergeMap(([dialogResult, currentMfe, pageData, pageName]) => {
-          const result = dialogResult?.result
-          if (!result) {
-            return of(undefined)
-          }
-          if (dialogResult.button !== 'primary') {
-            return of(undefined)
-          }
-          return this.saveSearchConfig(result, currentMfe, pageData, pageName)
+    createSearchConfig(
+      this.portalDialogService,
+      this.searchConfigService,
+      this.portalMessageService,
+      this.appStateService,
+      this.searchConfigStore,
+      this.resolvePageName(),
+      {
+        searchConfigName: '',
+        saveInputValues: false,
+        saveColumns: true,
+        frozeColumnSaveOption: false
+      }
+    ).subscribe((response) => {
+      if (response?.id) {
+        this.portalMessageService.info({
+          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
         })
-      )
-      .subscribe((response) => {
-        if (response?.id) {
-          this.portalMessageService.info({
-            summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
-          })
-          const config = response.configs.find((config) => config.id === response.id)
-          setTimeout(() => {
-            config && this.searchConfigStore.addSearchConfig(config)
-          })
-          setTimeout(() => {
-            config && this.searchConfigStore.setSelectedGroupKey(config.name)
-          })
-        }
-      })
-  }
-
-  private saveSearchConfig(
-    configData: CreateOrEditSearchDialogContent,
-    currentMfe: MfeInfo,
-    data: PageData,
-    pageName: string
-  ) {
-    const request: CreateSearchConfigRequest = {
-      appId: currentMfe.appId,
-      productName: currentMfe.productName,
-      fieldListVersion: 0,
-      isReadonly: false,
-      page: pageName,
-      name: configData.searchConfigName ?? '',
-      isAdvanced: configData.saveInputValues ? data.viewMode === advancedViewMode : false,
-      columns: configData.saveColumns ? data.displayedColumnsIds : [],
-      values: configData.saveInputValues ? parseFieldValues(data.fieldValues ?? {}) : {}
-    }
-    return this.searchConfigService.createSearchConfig(request).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_FAILURE'
+        const config = response.configs.find((config) => config.id === response.id)
+        setTimeout(() => {
+          config && this.searchConfigStore.addSearchConfig(config)
         })
-        return of(undefined)
-      })
-    )
+        setTimeout(() => {
+          config && this.searchConfigStore.setSelectedGroupKey(config.name)
+        })
+      }
+    })
   }
 }

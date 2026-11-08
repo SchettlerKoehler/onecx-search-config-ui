@@ -10,7 +10,7 @@
           dataKey="value"
           [ngModel]="vm.selectedGroupKey"
           (ngModelChange)="onColumnGroupChange($event)"
-          [options]="getOptions(vm)"
+          [options]="vm.options"
           [group]="true"
           [disabled]="!hasOptions(vm)"
           optionLabel="label"
@@ -33,8 +33,7 @@
               <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
                 item.label
               }}</span>
-              @let savedConfig = getConfigByName(vm, item.value);
-              @if (!item.isPredefined && canDelete(savedConfig)) {
+              @if (!item.isPredefined && canDelete(item.config)) {
                 <p-button
                   class="sc-search-config-delete"
                   [icon]="deleteIcon"
@@ -42,7 +41,7 @@
                   severity="danger"
                   [tabindex]="-1"
                   aria-hidden="true"
-                  (click)="onColumnGroupDelete(savedConfig); $event.stopPropagation()"
+                  (click)="onColumnGroupDelete(item.config); $event.stopPropagation()"
                 ></p-button>
               }
             </div>

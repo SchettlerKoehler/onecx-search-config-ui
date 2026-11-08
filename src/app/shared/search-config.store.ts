@@ -1,5 +1,6 @@
 import { Inject, Injectable, InjectionToken } from '@angular/core'
 import { ComponentStore } from '@ngrx/component-store'
+import { TranslateService } from '@ngx-translate/core'
 import { filter, tap, withLatestFrom } from 'rxjs'
 
 import { Topic } from '@onecx/accelerator'
@@ -17,7 +18,6 @@ import {
   areColumnsEqual,
   areValuesEqual,
   hasColumns,
-  hasOnlyColumns,
   hasOnlyValues,
   hasValues,
   parseFieldValues
@@ -86,16 +86,28 @@ export interface SearchConfigViewModel {
   layout: LayoutType | undefined
 }
 
+/**
+ * A leaf in the grouped column-group config select: a host predefined column group (`isPredefined`)
+ * or a saved config that stores columns (carrying its `config`). Predefined leaves carry the
+ * `isPredefined` flag so the template and the keyboard delete path can tell them apart from saved
+ * leaves even when a predefined key equals a saved config's name.
+ */
+export interface ColumnGroupSelectOption {
+  label: string
+  value: string
+  isPredefined?: boolean
+  isReadonly?: boolean
+  config?: SearchConfigInfo
+}
+
 export interface ColumnSelectionViewModel {
   nonSearchConfigGroupKeys: Array<string>
   customGroupKey: string | undefined
 
-  allGroupKeys: Array<string>
-  searchConfigsOnlyColumns: SearchConfigInfo[]
   searchConfigsWithColumns: SearchConfigInfo[]
   selectedGroupKey: string | undefined
-  currentConfig: SearchConfigInfo | undefined
-  layout: LayoutType | undefined
+  /** The grouped options for the config select, with each saved config attached to its leaf. */
+  options: Array<{ label: string; value: string; items: ColumnGroupSelectOption[] }>
 }
 
 export const SEARCH_CONFIG_STORE_NAME = new InjectionToken<string>('searchConfigStoreName')
@@ -128,7 +140,8 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     @Inject(SEARCH_CONFIG_STORE_NAME)
     private readonly storeName: string,
     @Inject(SEARCH_CONFIG_TOPIC)
-    private readonly searchConfigTopic$: SearchConfigTopic
+    private readonly searchConfigTopic$: SearchConfigTopic,
+    private readonly translateService?: TranslateService
   ) {
     super(initialState)
     this.activateStore(storeName)
@@ -161,6 +174,20 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   readonly setPageName = this.updater((state, newPageName: string) => {
     const stateToUpdate: Partial<SearchConfigState> = {
       pageName: newPageName
+    }
+    this.sendUpdateMessage(stateToUpdate, state)
+    return { ...state, ...stateToUpdate }
+  })
+
+  // Standalone (column-group) use: the host often does not set `pageName`, so the config load and Save As
+  // derive a fallback from `getLocation().applicationPath`. Set it only while `pageName` is still
+  // undefined so a header-provided page name always wins once it arrives.
+  readonly ensureStandalonePageName = this.updater((state, fallbackPageName: string) => {
+    if (state.pageName !== undefined) {
+      return state
+    }
+    const stateToUpdate: Partial<SearchConfigState> = {
+      pageName: fallbackPageName
     }
     this.sendUpdateMessage(stateToUpdate, state)
     return { ...state, ...stateToUpdate }
@@ -201,17 +228,19 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
   readonly deleteSearchConfig = this.updater((state, searchConfig: SearchConfigInfo) => {
     const isCurrentSearchConfigDeleted = state.currentSearchConfig?.id === searchConfig.id
+    // Standalone (column-group) use: the select shows `selectedGroupKey` directly. When it points at the
+    // deleted saved config, the selection is dropped too and falls back to the host custom group.
+    const isSelectedGroupDeleted = state.selectedGroupKey === searchConfig.name
 
     const currentSearchConfig = isCurrentSearchConfigDeleted ? undefined : state.currentSearchConfig
-
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, currentSearchConfig)
+    const selectedGroupKey = isSelectedGroupDeleted ? state.customGroupKey : state.selectedGroupKey
 
     const stateToUpdate: Partial<SearchConfigState> = {
       ...(isCurrentSearchConfigDeleted && {
         currentSearchConfig: currentSearchConfig
       }),
-      ...(isCurrentSearchConfigDeleted && {
-        selectedGroupKey: selectedGroupKey
+      ...(isSelectedGroupDeleted && {
+        selectedGroupKey
       }),
       searchConfigs: state.searchConfigs.filter((config) => config.id !== searchConfig.id)
     }
@@ -389,28 +418,40 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     })
   )
 
-  readonly columnSelectionVm$ = this.select(
-    this.state$,
-    this.currentConfig$,
-    (state, currentConfig): ColumnSelectionViewModel => {
-      const searchConfigsOnlyColumns = state.searchConfigs.filter((config) => hasOnlyColumns(config))
-      return {
-        searchConfigsOnlyColumns: searchConfigsOnlyColumns,
-        searchConfigsWithColumns: state.searchConfigs.filter((config) => hasColumns(config)),
-        nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
-        allGroupKeys: state.nonSearchConfigGroupKeys
-          .concat(
-            searchConfigsOnlyColumns.map((config) => config.name),
-            state.selectedGroupKey === undefined ? [] : [state.selectedGroupKey]
-          )
-          .filter((value, index, self) => self.indexOf(value) === index && value != null),
-        selectedGroupKey: state.selectedGroupKey,
-        currentConfig: currentConfig,
-        customGroupKey: state.customGroupKey,
-        layout: state.layout
-      }
+  // Grouped options for the column-group config select, built here so the template binds them and the
+  // leaf carries its saved `config` (no name-based lookup in the row). Predefined leaves are marked
+  // `isPredefined` so they are never confused with a saved config of the same name.
+  readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
+    const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
+    const label = (key: string) => (this.translateService ? this.translateService.instant(key) : key)
+    return {
+      searchConfigsWithColumns: searchConfigsWithColumns,
+      nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
+      selectedGroupKey: state.selectedGroupKey,
+      customGroupKey: state.customGroupKey,
+      options: [
+        {
+          label: label('COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED'),
+          value: 'predefined',
+          items: state.nonSearchConfigGroupKeys.map((key) => ({
+            label: label(key),
+            value: key,
+            isPredefined: true
+          }))
+        },
+        {
+          label: label('COLUMN_GROUP_SELECTION.GROUPS.SAVED'),
+          value: 'saved',
+          items: searchConfigsWithColumns.map((config) => ({
+            label: config.name,
+            value: config.name,
+            isReadonly: config.isReadonly,
+            config
+          }))
+        }
+      ]
     }
-  )
+  })
 
   // *********** Effects *********** //
 

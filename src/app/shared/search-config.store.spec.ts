@@ -141,6 +141,26 @@ describe('SearchConfigStore', () => {
     })
   })
 
+  describe('ensure standalone page name', () => {
+    it('should set the page name to the fallback while it is still undefined', () => {
+      store.patchState({})
+
+      store.ensureStandalonePageName('fallback-page')
+
+      expect(store.state().pageName).toBe('fallback-page')
+    })
+
+    it('should keep a header-provided page name over the fallback', () => {
+      store.patchState({
+        pageName: 'header-page'
+      })
+
+      store.ensureStandalonePageName('fallback-page')
+
+      expect(store.state().pageName).toBe('header-page')
+    })
+  })
+
   describe('set custom group key', () => {
     it('should update columnSelectionVm$ selector on change', (done) => {
       store.patchState({})
@@ -162,7 +182,7 @@ describe('SearchConfigStore', () => {
 
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
         expect(vm.nonSearchConfigGroupKeys).toStrictEqual(['1'])
-        expect(vm.allGroupKeys).toStrictEqual(['1'])
+        expect(vm.options[0].items).toStrictEqual([{ label: '1', value: '1', isPredefined: true }])
         done()
       })
     })
@@ -196,6 +216,30 @@ describe('SearchConfigStore', () => {
         expect(vm.searchConfigs).toStrictEqual([testConfigValuesAndColumns])
         done()
       })
+    })
+
+    it('should clear the selected group key when the deleted config is the selected one (standalone use)', () => {
+      store.patchState({
+        searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns],
+        selectedGroupKey: testConfigValuesAndColumns.name,
+        customGroupKey: 'custom-key'
+      })
+
+      store.deleteSearchConfig(testConfigValuesAndColumns)
+
+      expect(store.state().selectedGroupKey).toBe('custom-key')
+    })
+
+    it('should keep the selected group key when the deleted config is not the selected one', () => {
+      store.patchState({
+        searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns],
+        selectedGroupKey: testConfigOnlyValues.name,
+        customGroupKey: 'custom-key'
+      })
+
+      store.deleteSearchConfig(testConfigValuesAndColumns)
+
+      expect(store.state().selectedGroupKey).toBe(testConfigOnlyValues.name)
     })
 
     it('should send update message with all changes', (done) => {
@@ -254,7 +298,7 @@ describe('SearchConfigStore', () => {
         store.setSelectedGroupKey('default')
 
         store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-          expect(vm.currentConfig).toBeUndefined()
+          expect(vm.selectedGroupKey).toBe('default')
           done()
         })
       })
@@ -272,7 +316,7 @@ describe('SearchConfigStore', () => {
         store.setSelectedGroupKey('custom-key')
 
         store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-          expect(vm.currentConfig).toBeUndefined()
+          expect(vm.selectedGroupKey).toBe('custom-key')
           done()
         })
       })
@@ -295,6 +339,62 @@ describe('SearchConfigStore', () => {
           done()
         })
       })
+
+      it('should leave the header current config untouched when a predefined group is selected', () => {
+        // The header (search-config component) is active and has a current config. Selecting a host
+        // predefined column group is not a saved config, so `currentSearchConfig` stays unchanged —
+        // the predefined group only affects the column-group selection, never the header config.
+        store.patchState({
+          selectedGroupKey: 'default',
+          currentSearchConfig: testConfigBase,
+          nonSearchConfigGroupKeys: ['default'],
+          searchConfigs: [testConfigBase],
+          searchConfigComponentActive: true
+        })
+
+        store.setSelectedGroupKey('default')
+
+        expect(store.state().currentSearchConfig).toBe(testConfigBase)
+      })
+    })
+
+    // (b) Two-remote (column-group active) case: a saved-config selection made by the column store is
+    // kept in sync with the header through the topic. The saved config's name deliberately collides with
+    // a host predefined group key on the column side, so the header can only stay consistent if it
+    // receives the exact `selectedGroupKey` the column store resolved (a name-based lookup alone could
+    // confuse the saved config with the predefined group of the same name).
+    it('should keep the header selected group key in sync with a saved selection via the topic', () => {
+      const columnStore = new SearchConfigStore(
+        columngGroupSelectionStoreName,
+        mockSearchConfigStoreTopic as any as SearchConfigTopic
+      )
+      const headerStore = new SearchConfigStore(
+        searchConfigStoreName,
+        mockSearchConfigStoreTopic as any as SearchConfigTopic
+      )
+
+      // Both stores carry the saved config; on the column side its name is also a predefined group key.
+      columnStore.patchState({
+        searchConfigs: [testConfigValuesAndColumns],
+        nonSearchConfigGroupKeys: [testConfigValuesAndColumns.name],
+        columnGroupComponentActive: true,
+        searchConfigComponentActive: true
+      })
+      headerStore.patchState({
+        searchConfigs: [testConfigValuesAndColumns],
+        searchConfigComponentActive: true
+      })
+
+      columnStore.setSelectedGroupKey(testConfigValuesAndColumns.name)
+
+      // `setSelectedGroupKey` publishes synchronously on the shared topic, so the header store has
+      // already applied the selection — its `selectedGroupKey` matches the saved config name.
+      expect(columnStore.state().selectedGroupKey).toBe(testConfigValuesAndColumns.name)
+      expect(headerStore.state().selectedGroupKey).toBe(testConfigValuesAndColumns.name)
+      // The header still resolves the synced selection to the saved config (not the predefined key).
+      expect(
+        headerStore.state().searchConfigs.find((c) => c.name === headerStore.state().selectedGroupKey)
+      ).toStrictEqual(testConfigValuesAndColumns)
     })
   })
 
@@ -614,20 +714,26 @@ describe('SearchConfigStore', () => {
   })
 
   describe('columnSelectionVm$ selector', () => {
-    it('should contain search configs, selected key and non search config keys in all group keys', (done) => {
+    it('should build the grouped options from the predefined keys and the saved configs', (done) => {
       store.patchState({
-        selectedGroupKey: 'different-than-1',
+        selectedGroupKey: 'non-1',
         searchConfigs: [testConfigOnlyColumns],
         nonSearchConfigGroupKeys: ['non-1']
       })
 
-      store.setSelectedGroupKey('1')
-
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-        expect(vm.allGroupKeys).toHaveLength(3)
-        expect(vm.allGroupKeys.includes('1')).toBeTruthy()
-        expect(vm.allGroupKeys.includes('non-1')).toBeTruthy()
-        expect(vm.allGroupKeys.includes(testConfigOnlyColumns.name)).toBeTruthy()
+        expect(vm.selectedGroupKey).toBe('non-1')
+        expect(vm.searchConfigsWithColumns).toStrictEqual([testConfigOnlyColumns])
+        expect(vm.options).toHaveLength(2)
+        expect(vm.options[0].items).toStrictEqual([{ label: 'non-1', value: 'non-1', isPredefined: true }])
+        expect(vm.options[1].items).toStrictEqual([
+          {
+            label: testConfigOnlyColumns.name,
+            value: testConfigOnlyColumns.name,
+            isReadonly: testConfigOnlyColumns.isReadonly,
+            config: testConfigOnlyColumns
+          }
+        ])
         done()
       })
     })

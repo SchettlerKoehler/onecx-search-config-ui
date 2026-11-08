@@ -31,24 +31,28 @@
   --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
   /* Color of the "modified" marker on a config row (used by a later ticket). */
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
-  /* Color of a config option-group header in the list (used by a later ticket). */
+  /* Color of a config option-group header in the list (used by the column remote's grouped headers). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
   /* Width of the reusable delete-confirm dialog (applied via PortalDialogConfig.width). */
   --onecx-search-config-dialog-width: 30rem;
 }
 
 /*
- * Search header remote: the config select joined to the Save As button.
+ * Search header and column-group remotes: the same joined config select + Save As.
  *
- * Selectors are rooted at the remote's host element (ocx-search-config-component, registered as
- * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
- * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the
- * host element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips
- * append to `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The
- * delete-confirm dialog is portaled outside the remote element and is sized and reached by the
- * host through data-style-id scoping (see the README).
+ * Both remotes reuse the `sc-search-config-*` style hooks and the same design tokens, so their host
+ * selectors are grouped into one rule. Selectors are rooted at the remote's host element (registered
+ * as a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
+ * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the host
+ * element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips append to
+ * `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The delete-confirm
+ * dialog is portaled outside the remote element and is sized and reached by the host through
+ * data-style-id scoping (see the README). The only difference between the remotes is the grouped
+ * option headers ("Predefined" / "Saved"), which only the column remote renders; those are styled in
+ * a column-only rule below.
  */
-ocx-search-config-component {
+ocx-search-config-component,
+ocx-column-group-selection-component {
   .sc-search-config-group {
     width: var(--onecx-search-config-width);
 
@@ -109,66 +113,19 @@ ocx-search-config-component {
 }
 
 /*
- * Column-group selector remote: the same joined config select + Save As as the search header, but the
- * options are grouped ("Predefined" host column groups and "Saved" configs that store columns). The
- * control reuses the `sc-search-config-*` style hooks and the same design tokens, scoped to this
- * remote's own host element (ocx-column-group-selection-component) so the two remotes stay independent.
- * The option-list panel renders inside `<p-select>` (PrimeNG's default `self` appendTo), reached
- * through the stable `panelStyleClass`; the grouped option headers are styled through the app-owned
- * group-header token (no PrimeNG token targets the custom `#group` template header).
+ * Column-group remote only: the grouped option headers ("Predefined" / "Saved"). These exist only in
+ * the column remote's option list, so they are styled on its host element alone rather than in the
+ * shared rule above. PrimeNG has no token for the custom `#group` template header, so the app-owned
+ * group-header color drives the text color and the PrimeNG option-group weight/transform tokens give
+ * the header its look.
  */
 ocx-column-group-selection-component {
-  .sc-search-config-group {
-    width: var(--onecx-search-config-width);
-    --p-inputgroup-addon-border-radius: var(--onecx-search-config-radius);
-  }
-
-  .sc-search-config-select {
-    height: var(--onecx-search-config-height);
-  }
-
-  /* Config-select option list: single-line rows (ellipsis + tooltip) plus the option-group headers. */
   .sc-search-config-panel {
-    /* Grouped option header ("Predefined" / "Saved"). PrimeNG has no token for the custom `#group`
-     * template header, so the app-owned group-header color drives it. */
     .sc-search-config-group-header {
       display: block;
       color: var(--onecx-search-config-group-header-color);
-    }
-
-    .sc-search-config-row {
-      display: flex;
-      align-items: center;
-      /* Spacing between the group name and its delete affordance. PrimeNG select-list gap token. */
-      gap: var(--p-select-list-gap);
-      width: 100%;
-    }
-
-    .sc-search-config-row-name {
-      flex: 1 1 auto;
-      min-width: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. The
-     * :root variables drive the button through these scoped PrimeNG danger-token overrides. */
-    .sc-search-config-delete {
-      flex: 0 0 auto;
-      margin: 0;
-      --p-button-text-danger-color: var(--onecx-search-config-delete-color);
-      --p-button-text-danger-hover-background: var(--onecx-search-config-delete-hover-background);
-    }
-  }
-
-  /* Joined Save As addon (filled primary button) — identical treatment to the header remote. */
-  .sc-search-config-save-as {
-    height: var(--onecx-search-config-height);
-    --p-inputgroup-addon-border-color: var(--p-button-primary-border-color);
-
-    .p-button {
-      height: 100%;
+      text-transform: uppercase;
+      font-weight: var(--p-select-option-group-font-weight);
     }
   }
 }

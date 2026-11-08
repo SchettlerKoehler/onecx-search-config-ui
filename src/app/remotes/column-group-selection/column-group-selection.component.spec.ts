@@ -13,12 +13,12 @@ import {
 } from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
-import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, throwError } from 'rxjs'
+import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, take, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 import { Select } from 'primeng/select'
 import { Tooltip } from 'primeng/tooltip'
 
-import { FakeTopic } from '@onecx/accelerator'
+import { FakeTopic, getLocation } from '@onecx/accelerator'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 import { PortalDialogService } from '@onecx/angular-accelerator'
 import { AppStateService } from '@onecx/angular-integration-interface'
@@ -42,7 +42,7 @@ import {
   SearchConfigStore,
   SearchConfigTopic
 } from 'src/app/shared/search-config.store'
-import { advancedViewMode, basicViewMode, SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
+import { advancedViewMode, basicViewMode, COLUMN_GROUP_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 import { CreateOrEditSearchConfigDialogComponent } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
 import { Configuration, SearchConfigAPIService } from 'src/app/shared/generated'
 import { OneCXColumnGroupSelectionComponent } from './column-group-selection.component'
@@ -281,7 +281,9 @@ describe('OneCXColumnGroupSelectionComponent', () => {
 
       const vm = await firstValueFrom(store.columnSelectionVm$)
 
-      expect(vm.searchConfigsOnlyColumns.map((item) => item.name)).toEqual([onlyColumnsConfig.name])
+      // Both `config` (columns + values) and `onlyColumnsConfig` store columns, so both are listed;
+      // `onlyValuesConfig` stores values only and is excluded.
+      expect(vm.searchConfigsWithColumns.map((item) => item.name)).toEqual([config.name, onlyColumnsConfig.name])
     })
 
     it('should normalize unique predefined group keys and trigger selected group updates', fakeAsync(() => {
@@ -338,6 +340,11 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
       const fakeStore = {
         pageName$: of('page-name'),
+        // `loadSearchConfigs()` (called in the constructor) resolves the page name from `state$` and
+        // gates the load on `isSearchConfigComponentActive$`, so both must be present on the fake store
+        // (the load itself is a no-op here: `baseUrl` never emits, so no fetch is triggered).
+        state$: of({ pageName: 'page-name' }),
+        isSearchConfigComponentActive$: of(false),
         selectedGroupKey$,
         columnSelectionVm$: vm$,
         searchConfigs: [],
@@ -387,6 +394,11 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
       const fakeStore = {
         pageName$: of('page-name'),
+        // `loadSearchConfigs()` (called in the constructor) resolves the page name from `state$` and
+        // gates the load on `isSearchConfigComponentActive$`, so both must be present on the fake store
+        // (the load itself is a no-op here: `baseUrl` never emits, so no fetch is triggered).
+        state$: of({ pageName: 'page-name' }),
+        isSearchConfigComponentActive$: of(false),
         selectedGroupKey$,
         columnSelectionVm$: vm$,
         searchConfigs: [],
@@ -454,6 +466,11 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
       const fakeStore = {
         pageName$: of('page-name'),
+        // `loadSearchConfigs()` (called in the constructor) resolves the page name from `state$` and
+        // gates the load on `isSearchConfigComponentActive$`, so both must be present on the fake store
+        // (the load itself is a no-op here: `baseUrl` never emits, so no fetch is triggered).
+        state$: of({ pageName: 'page-name' }),
+        isSearchConfigComponentActive$: of(false),
         selectedGroupKey$,
         columnSelectionVm$: vm$,
         searchConfigs: [],
@@ -519,6 +536,11 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
       const fakeStore = {
         pageName$: of('page-name'),
+        // `loadSearchConfigs()` (called in the constructor) resolves the page name from `state$` and
+        // gates the load on `isSearchConfigComponentActive$`, so both must be present on the fake store
+        // (the load itself is a no-op here: `baseUrl` never emits, so no fetch is triggered).
+        state$: of({ pageName: 'page-name' }),
+        isSearchConfigComponentActive$: of(false),
         selectedGroupKey$,
         columnSelectionVm$: vm$,
         searchConfigs: [],
@@ -559,47 +581,59 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('grouped options', () => {
-    it('should group the host column groups under Predefined and the saved column configs under Saved', () => {
-      const vmValue = {
+    it('should group the host column groups under Predefined and the saved column configs under Saved', (done) => {
+      store.patchState({
         nonSearchConfigGroupKeys: ['default', 'full'],
-        searchConfigsWithColumns: [config, onlyColumnsConfig],
+        searchConfigs: [config, onlyColumnsConfig],
         customGroupKey: 'custom'
-      } as any
+      } as any)
 
-      const options = component.getOptions(vmValue)
-
-      expect(options).toEqual([
-        {
-          label: 'Predefined',
-          value: 'predefined',
-          items: [
-            { label: 'default', value: 'default', isPredefined: true },
-            { label: 'full', value: 'full', isPredefined: true }
-          ]
-        },
-        {
-          label: 'Saved',
-          value: 'saved',
-          items: [
-            { label: config.name, value: config.name, isReadonly: false },
-            { label: onlyColumnsConfig.name, value: onlyColumnsConfig.name, isReadonly: false }
-          ]
-        }
-      ])
+      store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
+        expect(vm.options).toEqual([
+          {
+            label: 'Predefined',
+            value: 'predefined',
+            items: [
+              { label: 'default', value: 'default', isPredefined: true },
+              { label: 'full', value: 'full', isPredefined: true }
+            ]
+          },
+          {
+            label: 'Saved',
+            value: 'saved',
+            items: [
+              { label: config.name, value: config.name, isReadonly: config.isReadonly, config },
+              {
+                label: onlyColumnsConfig.name,
+                value: onlyColumnsConfig.name,
+                isReadonly: onlyColumnsConfig.isReadonly,
+                config: onlyColumnsConfig
+              }
+            ]
+          }
+        ])
+        done()
+      })
     })
 
-    it('should exclude value-only configs from the Saved group', () => {
-      const vmValue = {
+    it('should exclude value-only configs from the Saved group', (done) => {
+      store.patchState({
         nonSearchConfigGroupKeys: [],
-        searchConfigsWithColumns: [onlyColumnsConfig],
+        searchConfigs: [onlyColumnsConfig, onlyValuesConfig],
         customGroupKey: 'custom'
-      } as any
+      } as any)
 
-      const options = component.getOptions(vmValue)
-
-      expect(options[1].items).toEqual([
-        { label: onlyColumnsConfig.name, value: onlyColumnsConfig.name, isReadonly: false }
-      ])
+      store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
+        expect(vm.options[1].items).toEqual([
+          {
+            label: onlyColumnsConfig.name,
+            value: onlyColumnsConfig.name,
+            isReadonly: onlyColumnsConfig.isReadonly,
+            config: onlyColumnsConfig
+          }
+        ])
+        done()
+      })
     })
   })
 
@@ -655,6 +689,14 @@ describe('OneCXColumnGroupSelectionComponent', () => {
     it('should show the fixed column group label once a group is selected', () => {
       expect(component.selectLabel({ selectedGroupKey: 'config-1' } as any)).toBe('COLUMN_GROUP_SELECTION.LABEL')
     })
+
+    it('should show the host placeholder while the selected key is the host custom group', () => {
+      component.placeholderKey = 'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
+
+      expect(component.selectLabel({ selectedGroupKey: 'custom', customGroupKey: 'custom' } as any)).toBe(
+        'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
+      )
+    })
   })
 
   describe('delete actions', () => {
@@ -697,6 +739,50 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         }
       })
       expect(deleteSpy).toHaveBeenCalledWith(config)
+    }))
+
+    // M2: standalone use — deleting the currently selected saved config also clears the selection so
+    // the select does not keep pointing at a config that no longer exists; it falls back to the host
+    // custom group.
+    it('should clear the selected group key to the custom group when the selected config is deleted', fakeAsync(() => {
+      store.patchState({
+        searchConfigs: [config],
+        selectedGroupKey: config.name,
+        customGroupKey: 'custom'
+      })
+
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          button: 'primary'
+        } as any)
+      )
+      jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
+
+      component.onColumnGroupDelete(config)
+      tick(500)
+
+      expect(store.state().searchConfigs).toEqual([])
+      expect(store.state().selectedGroupKey).toBe('custom')
+    }))
+
+    it('should keep the selected group key when a non-selected config is deleted', fakeAsync(() => {
+      store.patchState({
+        searchConfigs: [config, onlyColumnsConfig],
+        selectedGroupKey: onlyColumnsConfig.name,
+        customGroupKey: 'custom'
+      })
+
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          button: 'primary'
+        } as any)
+      )
+      jest.spyOn(searchConfigServiceSpy, 'deleteSearchConfig').mockReturnValue(of({} as any))
+
+      component.onColumnGroupDelete(config)
+      tick(500)
+
+      expect(store.state().selectedGroupKey).toBe(onlyColumnsConfig.name)
     }))
 
     it('should not delete the config when the dialog was closed', fakeAsync(() => {
@@ -817,7 +903,8 @@ describe('OneCXColumnGroupSelectionComponent', () => {
             searchConfigName: '',
             saveInputValues: false,
             saveColumns: true,
-            frozeColumnSaveOption: false
+            frozeColumnSaveOption: false,
+            frozeColumnSaveOptionExplanation: undefined
           }
         },
         'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
@@ -1145,6 +1232,84 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       expect(addSpy).toHaveBeenCalledTimes(0)
       expect(setGroupSpy).toHaveBeenCalledTimes(0)
     }))
+
+    // M1: standalone Save As — the host usually never sets `pageName`, so the request derives the
+    // page name from `getLocation().applicationPath` instead of silently POSTing `undefined`.
+    it('should post the fallback page name when the store has no page name set', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+      const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
+      store.patchState({
+        searchConfigs: [config],
+        fieldValues: {},
+        displayedColumnsIds: ['my-col'],
+        viewMode: basicViewMode
+      })
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            searchConfigName: config.name,
+            saveInputValues: false,
+            saveColumns: true
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onColumnGroupSaveAs()
+      tick(500)
+
+      expect(createCallSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: getLocation().applicationPath
+        })
+      )
+      // The fallback is persisted so subsequent requests resolve it from the store.
+      expect(store.state().pageName).toBe(getLocation().applicationPath)
+    }))
+
+    it('should not silently drop a confirmed dialog when the create call fails', fakeAsync(() => {
+      const appState = TestBed.inject(AppStateService)
+      jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
+        of({
+          appId: 'my-app',
+          productName: 'my-product'
+        } as any)
+      )
+      jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(throwError(() => new Error('my-error')))
+      store.patchState({
+        searchConfigs: [],
+        pageName: 'my-page',
+        fieldValues: {},
+        displayedColumnsIds: ['my-col'],
+        viewMode: basicViewMode
+      })
+      // A confirmed (primary) dialog is not swallowed: the failure surfaces as an error toast and no
+      // config is added.
+      jest.spyOn(portalDialogSpy, 'openDialog').mockReturnValue(
+        of({
+          result: {
+            searchConfigName: config.name,
+            saveInputValues: false,
+            saveColumns: true
+          },
+          button: 'primary'
+        } as any)
+      )
+
+      component.onColumnGroupSaveAs()
+      tick(500)
+
+      expect(portalMessageSpy.error).toHaveBeenCalledWith({
+        summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_FAILURE'
+      })
+      expect(store.state().searchConfigs).toHaveLength(0)
+    }))
   })
 
   describe('load search configs', () => {
@@ -1201,6 +1366,61 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       expect(getSearchConfigInfosSpy).toHaveBeenCalledWith({
         appId: 'appId',
         page: 'page-name',
+        productName: 'product'
+      })
+      expect(localStore.state().searchConfigs).toEqual(configs)
+      expect(localComponent).toBeTruthy()
+    }))
+
+    // M1: standalone load — with no `pageName` input the configs are fetched with the fallback page
+    // name derived from `getLocation().applicationPath` (only the base url and the current MFE are
+    // provided, as the host does not set a page name).
+    it('should load the configs with the fallback page name when no page name is provided', fakeAsync(() => {
+      const configs = [
+        {
+          name: 'config-1',
+          values: {},
+          columns: ['col-1']
+        }
+      ]
+
+      const getSearchConfigInfosSpy = jest
+        .spyOn(searchConfigServiceSpy, 'getSearchConfigInfos')
+        .mockReturnValue(of({ configs: configs } as any))
+
+      const localStore = new SearchConfigStore('store', new SearchConfigTopic())
+      const localBaseUrl = new ReplaySubject<RemoteComponentConfig>(1)
+      localBaseUrl.next({
+        baseUrl: 'base_url'
+      } as any)
+      // No `setPageName` — the store's `pageName` stays undefined, so the load derives the fallback.
+
+      const appStateService = {
+        currentMfe$: {
+          asObservable: () => of({ appId: 'appId', productName: 'product' } as any)
+        }
+      } as any
+
+      const localComponent = runInInjectionContext(
+        TestBed.inject(Injector),
+        () =>
+          new OneCXColumnGroupSelectionComponent(
+            localBaseUrl,
+            { lang$: new BehaviorSubject('en') } as any,
+            { use: jest.fn() } as any,
+            searchConfigServiceSpy,
+            portalDialogSpy,
+            portalMessageSpy,
+            appStateService,
+            localStore
+          )
+      )
+
+      tick(100)
+
+      expect(getSearchConfigInfosSpy).toHaveBeenCalledWith({
+        appId: 'appId',
+        page: getLocation().applicationPath,
         productName: 'product'
       })
       expect(localStore.state().searchConfigs).toEqual(configs)
@@ -1363,7 +1583,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(saveAs).not.toBeNull()
     expect(await (saveAs as NonNullable<typeof saveAs>).getLabel()).toBe('Save As')
     const iconSpan = hostFixture.nativeElement.querySelector(
-      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} .p-button-icon`
+      `#${COLUMN_GROUP_SAVE_AS_BUTTON_ID} .p-button-icon`
     ) as HTMLElement
     expect(iconSpan).toBeTruthy()
     expect(iconSpan.classList.contains('pi-save')).toBe(true)
@@ -1471,7 +1691,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
 
     const saveAs = await (await harness()).getSaveAsButton()
     const saveAsButton = hostFixture.nativeElement.querySelector(
-      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+      `#${COLUMN_GROUP_SAVE_AS_BUTTON_ID} button`
     ) as HTMLButtonElement
     expect(saveAsButton.disabled).toBe(false)
 
@@ -1495,7 +1715,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
 
     // Save As stays enabled.
     const saveAsButton = hostFixture.nativeElement.querySelector(
-      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+      `#${COLUMN_GROUP_SAVE_AS_BUTTON_ID} button`
     ) as HTMLButtonElement
     expect(saveAsButton.disabled).toBe(false)
   })
@@ -1539,6 +1759,8 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(tooltip).toBeTruthy()
     expect(tooltip.getOption('showOnEllipsis')).toBe(true)
     expect(tooltip.getOption('tooltipLabel')).toBe(config.name)
+    // The tooltip is bound to (its target is) the row's name span, not the whole row.
+    expect(tooltip.el.nativeElement).toBe(nameSpan)
   })
 
   it('should delete the focused saved-config option when Delete is pressed on the open select combobox', async () => {
@@ -1577,7 +1799,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(deleteEvent.defaultPrevented).toBe(true)
   })
 
-  it('should not delete via the keyboard path when a grouped header is focused', async () => {
+  it('should not delete via the keyboard path when a predefined group is focused', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
     await patchConfigs([config], ['default'])
 
@@ -1594,6 +1816,32 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     const predefinedLeafIndex = visibleOptions.findIndex((option) => option?.value === 'default')
     expect(predefinedLeafIndex).toBeGreaterThanOrEqual(0)
     select.focusedOptionIndex.set(predefinedLeafIndex)
+    combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
+    await hostFixture.whenStable()
+    expect(deleteSpy).not.toHaveBeenCalled()
+  })
+
+  it('should not delete a saved config of the same name when the predefined leaf is focused', async () => {
+    ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
+    // A saved config whose name collides with a host predefined column-group key. The predefined leaf
+    // must not resolve to the saved config by name — the `isPredefined` guard stops the delete even
+    // though `state.searchConfigs.find((c) => c.name === option.value)` would otherwise match.
+    const collidingConfig = { ...config, name: 'default' }
+    await patchConfigs([collidingConfig], ['default'])
+
+    const deleteSpy = jest.spyOn(childComponent, 'onColumnGroupDelete').mockImplementation(() => {})
+    const select = (childComponent as any).select() as Select
+    const combobox = comboboxOf(select)
+
+    await (await (await harness()).getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    // Both the predefined leaf and the saved-config leaf resolve to `value: 'default'`; PrimeNG keeps
+    // the first (predefined, `isPredefined: true`) leaf focused.
+    const visibleOptions = select.visibleOptions() as any[]
+    const predefinedLeaf = visibleOptions.find((option) => option?.isPredefined && option?.value === 'default')
+    expect(predefinedLeaf).toBeTruthy()
+    select.focusedOptionIndex.set(visibleOptions.indexOf(predefinedLeaf as any))
     combobox.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true, cancelable: true }))
     await hostFixture.whenStable()
     expect(deleteSpy).not.toHaveBeenCalled()

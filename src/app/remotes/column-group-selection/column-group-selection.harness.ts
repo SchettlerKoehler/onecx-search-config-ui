@@ -3,20 +3,21 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
 
 import { ListItemHarness, PButtonHarness, PSelectHarness } from '@onecx/angular-testing'
 
-import { SEARCH_CONFIG_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
+import { COLUMN_GROUP_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
 
 /**
  * Column-group selector of the column remote. It renders the same joined config select + Save As as
  * the search header remote (grouped: a "Predefined" group of host column groups and a "Saved" group
  * of saved configs that store columns), so the option rows and the joined Save As reuse the
- * `sc-search-config-*` style hooks and the shared Save As / Delete button ids. The `p-select` panel
- * renders inside `<p-select>` (PrimeNG's default `self` appendTo), so it stays scoped to this remote.
+ * `sc-search-config-*` style hooks; the Delete button reuses the shared delete id, while the joined
+ * Save As uses the column remote's own `COLUMN_GROUP_SAVE_AS_BUTTON_ID`. The `p-select` panel renders
+ * inside `<p-select>` (PrimeNG's default `self` appendTo), so it stays scoped to this remote.
  */
 export class OneCXColumnGroupSelectionHarness extends ContentContainerComponentHarness {
   static readonly hostSelector = 'app-ocx-column-group-selection'
 
   private readonly _select = this.locatorForOptional(PSelectHarness)
-  private readonly _saveAsButton = this.locatorForOptional(PButtonHarness.with({ id: SEARCH_CONFIG_SAVE_AS_BUTTON_ID }))
+  private readonly _saveAsButton = this.locatorForOptional(PButtonHarness.with({ id: COLUMN_GROUP_SAVE_AS_BUTTON_ID }))
   // The trash button is the only `.sc-search-config-delete` button in the panel. `locatorForAll` on this
   // `ContentContainerComponentHarness` resolves it from the harness host element, not the document root.
   private readonly _deleteButtons = this.locatorForAll(PButtonHarness.with({ selector: '.sc-search-config-delete' }))

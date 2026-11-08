@@ -36,6 +36,7 @@
       "CREATE_SUCCESS": "Successfully added search config",
       "CREATE_FAILURE": "Failed to add search config"
     },
+    "LOAD_FAILURE": "Failed to load search configs",
     "DELETE_CONFIRM": {
       "HEADER": "Delete search config?",
       "MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",

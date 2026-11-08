@@ -4,8 +4,8 @@ OneCX Search Config Ui
 
 ## Search-config styling
 
-The global stylesheet (`src/styles.scss`) owns the `--onecx-search-config-*` design tokens and the
-search header's custom styles.
+The global stylesheet (`src/styles.scss`) owns the `--onecx-search-config-*` design tokens and both
+remotes' custom styles (the search header and the column-group selector).
 
 **Rule: PrimeNG tokens or `--onecx-search-config-*` only, in `styles.scss`.** Every custom value must
 be a PrimeNG design token (a `--p-*` variable) or one of the `--onecx-search-config-*` variables defined

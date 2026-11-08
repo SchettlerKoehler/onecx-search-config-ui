@@ -36,6 +36,7 @@
       "CREATE_SUCCESS": "Suchkonfiguration erfolgreich hinzugefügt",
       "CREATE_FAILURE": "Fehler beim Erstellen der Suchkonfiguration"
     },
+    "LOAD_FAILURE": "Fehler beim Laden der Suchkonfigurationen",
     "DELETE_CONFIRM": {
       "HEADER": "Suchkonfiguration löschen?",
       "MESSAGE": "Möchten Sie '{{config}}' wirklich löschen? Das kann nicht rückgängig gemacht werden.",
@@ -48,7 +49,7 @@
   "COLUMN_GROUP_SELECTION": {
     "LABEL": "Spaltengruppe",
     "GROUPS": {
-      "PREDEFINED": "Vorgedefiniert",
+      "PREDEFINED": "Vordefiniert",
       "SAVED": "Gespeichert"
     },
     "SELECT": {

@@ -2,17 +2,7 @@ import { AsyncPipe, Location } from '@angular/common'
 import { Component, EventEmitter, Inject, Input, OnDestroy, ChangeDetectionStrategy, viewChild } from '@angular/core'
 import { FormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import {
-  ReplaySubject,
-  Subscription,
-  catchError,
-  combineLatest,
-  debounceTime,
-  map,
-  mergeMap,
-  of,
-  withLatestFrom
-} from 'rxjs'
+import { ReplaySubject, Subscription, debounceTime, withLatestFrom } from 'rxjs'
 
 import { ButtonModule } from 'primeng/button'
 import { PrimeIcons } from 'primeng/api'
@@ -24,7 +14,6 @@ import { TooltipModule } from 'primeng/tooltip'
 
 import { AngularAcceleratorModule, SearchConfigData, PortalDialogService } from '@onecx/angular-accelerator'
 import { AppStateService, PortalMessageService, UserService } from '@onecx/angular-integration-interface'
-import { MfeInfo } from '@onecx/integration-interface'
 import {
   AngularRemoteComponentsModule,
   ocxRemoteComponent,
@@ -32,22 +21,8 @@ import {
 } from '@onecx/angular-remote-components'
 import { REMOTE_COMPONENT_CONFIG, RemoteComponentConfig } from '@onecx/angular-utils'
 
-import {
-  Configuration,
-  CreateSearchConfigRequest,
-  SearchConfigAPIService,
-  SearchConfigInfo
-} from 'src/app/shared/generated'
-import {
-  PageData,
-  SearchConfigStore,
-  SearchConfigViewModel,
-  UnparsedFieldValues
-} from 'src/app/shared/search-config.store'
-import {
-  CreateOrEditSearchConfigDialogComponent,
-  CreateOrEditSearchDialogContent
-} from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
+import { Configuration, SearchConfigAPIService, SearchConfigInfo } from 'src/app/shared/generated'
+import { SearchConfigStore, SearchConfigViewModel, UnparsedFieldValues } from 'src/app/shared/search-config.store'
 import {
   advancedViewMode,
   advancedViewModeType,
@@ -55,8 +30,9 @@ import {
   basicViewModeType,
   SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
-import { hasColumns, hasValues, parseFieldValues } from 'src/app/shared/search-config.utils'
+import { hasColumns, hasValues } from 'src/app/shared/search-config.utils'
 import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
+import { createSearchConfig, loadSearchConfigInfos } from 'src/app/shared/search-config-create'
 import { environment } from 'src/environments/environment'
 
 @Component({
@@ -127,23 +103,20 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       this.translateService.use(lang)
     })
 
-    combineLatest([this.baseUrl, this.searchConfigStore.pageName$, this.appStateService.currentMfe$.asObservable()])
-      .pipe(
-        mergeMap(([_, pageName, currentMfe]) => {
-          return this.searchConfigService
-            .getSearchConfigInfos({
-              appId: currentMfe.appId,
-              page: pageName,
-              productName: currentMfe.productName
-            })
-            .pipe(map((response) => response.configs))
-        })
-      )
-      .subscribe((searchConfigs) => {
-        setTimeout(() => {
-          this.searchConfigStore.setSearchConfigs(searchConfigs)
-        })
+    // Load the saved configs once the remote base url, the store's page name and the current MFE are
+    // all available. The header always loads (no guard); a failed request fires an error toast and
+    // stores no configs.
+    loadSearchConfigInfos(
+      this.baseUrl,
+      this.appStateService,
+      this.searchConfigService,
+      this.portalMessageService,
+      this.searchConfigStore.pageName$
+    ).subscribe((searchConfigs) => {
+      setTimeout(() => {
+        this.searchConfigStore.setSearchConfigs(searchConfigs)
       })
+    })
 
     this.currentConfigSub = this.searchConfigStore.currentConfig$
       .pipe(
@@ -207,54 +180,36 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       frozeColumnSaveOptionExplanation = 'SEARCH_CONFIG.TABLE_VIEW_INACTIVE'
     }
 
-    this.portalDialogService
-      .openDialog<CreateOrEditSearchDialogContent>(
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_HEADER',
-        {
-          type: CreateOrEditSearchConfigDialogComponent,
-          inputs: {
-            searchConfigName: '',
-            saveInputValues: false,
-            saveColumns: false,
-            frozeColumnSaveOption: !(vm.isColumnGroupComponentActive && vm.layout === 'table'),
-            frozeColumnSaveOptionExplanation
-          }
-        },
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-        'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
-      )
-      .pipe(
-        withLatestFrom(
-          this.appStateService.currentMfe$.asObservable(),
-          this.searchConfigStore.currentPageData$,
-          this.searchConfigStore.pageName$
-        ),
-        mergeMap(([dialogResult, currentMfe, pageData, pageName]) => {
-          const result = dialogResult?.result
-
-          if (!result) {
-            return of(undefined)
-          }
-          if (dialogResult.button !== 'primary') {
-            return of(undefined)
-          }
-          return this.saveSearchConfig(result, currentMfe, pageData, pageName)
+    // The dialog, request and toasts live in the shared `createSearchConfig` helper (so both remotes
+    // open the same dialog); on success we just add the created config to the store and select it.
+    createSearchConfig(
+      this.portalDialogService,
+      this.searchConfigService,
+      this.portalMessageService,
+      this.appStateService,
+      this.searchConfigStore,
+      this.searchConfigStore.pageName$,
+      {
+        searchConfigName: '',
+        saveInputValues: false,
+        saveColumns: false,
+        frozeColumnSaveOption: !(vm.isColumnGroupComponentActive && vm.layout === 'table'),
+        frozeColumnSaveOptionExplanation
+      }
+    ).subscribe((response) => {
+      if (response?.id) {
+        this.portalMessageService.info({
+          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
         })
-      )
-      .subscribe((response) => {
-        if (response?.id) {
-          this.portalMessageService.info({
-            summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
-          })
-          const config = response.configs.find((config) => config.id === response.id)
-          setTimeout(() => {
-            config && this.searchConfigStore.addSearchConfig(config)
-          })
-          setTimeout(() => {
-            config && this.searchConfigStore.setCurrentConfig(config)
-          })
-        }
-      })
+        const config = response.configs.find((config) => config.id === response.id)
+        setTimeout(() => {
+          config && this.searchConfigStore.addSearchConfig(config)
+        })
+        setTimeout(() => {
+          config && this.searchConfigStore.setCurrentConfig(config)
+        })
+      }
+    })
   }
 
   // Structural directives (ocxIfPermission/ngIf) are not rendered inside PrimeNG's #item template,
@@ -312,33 +267,5 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       event.preventDefault()
       this.onSearchConfigDelete(option)
     }
-  }
-
-  private saveSearchConfig(
-    configData: CreateOrEditSearchDialogContent,
-    currentMfe: MfeInfo,
-    data: PageData,
-    pageName: string
-  ) {
-    const request: CreateSearchConfigRequest = {
-      appId: currentMfe.appId,
-      productName: currentMfe.productName,
-      fieldListVersion: 0,
-      isReadonly: false,
-      page: pageName,
-      name: configData.searchConfigName ?? '',
-      isAdvanced: configData.saveInputValues ? data.viewMode === advancedViewMode : false,
-      columns: configData.saveColumns ? data.displayedColumnsIds : [],
-      values: configData.saveInputValues ? parseFieldValues(data.fieldValues ?? {}) : {}
-    }
-    return this.searchConfigService.createSearchConfig(request).pipe(
-      catchError((error) => {
-        console.error(error)
-        this.portalMessageService.error({
-          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_FAILURE'
-        })
-        return of(undefined)
-      })
-    )
   }
 }
