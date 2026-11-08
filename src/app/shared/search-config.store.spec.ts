@@ -75,7 +75,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('searchConfigVm$ selector', () => {
-    it('should expose only configs with values and no current config in the view model', async () => {
+    it('should expose only configs with values and no current config in the view model when the store holds value- and column-storing configs', async () => {
       store.patchState({
         searchConfigs: [testConfigBase, testConfigOnlyValues, testConfigOnlyColumns],
         currentSearchConfig: undefined
@@ -89,7 +89,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('activate store', () => {
-    it('should update isSearchConfigComponentActive$ selector on change for search config store', (done) => {
+    it('should update isSearchConfigComponentActive$ selector when the store is activated', (done) => {
       store.patchState({})
 
       store.activateStore(searchConfigStoreName)
@@ -102,7 +102,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('set page name', () => {
-    it('should update pageName$ selector on change', (done) => {
+    it('should update the pageName$ selector when the page name is set', (done) => {
       store.patchState({})
 
       store.setPageName('my-page')
@@ -113,7 +113,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should catch publish error and log it', async () => {
+    it('should catch the publish error and log it when the topic publish rejects', async () => {
       const error = new Error('publish failed')
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
       jest.spyOn(mockSearchConfigStoreTopic, 'publish').mockRejectedValue(error)
@@ -127,7 +127,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('set custom group key', () => {
-    it('should update columnSelectionVm$ selector on change', (done) => {
+    it('should update the columnSelectionVm$ selector when the custom group key is set', (done) => {
       store.patchState({})
 
       store.setCustomGroupKey('custom-key')
@@ -140,7 +140,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('set non search config group keys', () => {
-    it('should update columnSelectionVm$ selector on change', (done) => {
+    it('should update the columnSelectionVm$ selector when the non-search-config group keys are set', (done) => {
       store.patchState({})
 
       store.setNonSearchConfigGroupKeys(['1'])
@@ -154,7 +154,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('add search config', () => {
-    it('should send update message', (done) => {
+    it('should send an update message when a search config is added', (done) => {
       store.patchState({})
 
       store.addSearchConfig(testConfigValuesAndColumns)
@@ -170,7 +170,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('delete search config', () => {
-    it('should update searchConfigVm$ selector', (done) => {
+    it('should update the searchConfigVm$ selector when a search config is deleted', (done) => {
       store.patchState({
         searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns, testConfigOnlyColumns]
       })
@@ -207,7 +207,7 @@ describe('SearchConfigStore', () => {
       expect(store.state().selectedGroupKey).toBe(testConfigOnlyValues.name)
     })
 
-    it('should send update message with all changes', (done) => {
+    it('should send an update message with all changes when a config is deleted', (done) => {
       store.patchState({
         currentSearchConfig: testConfigOnlyColumns,
         searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns, testConfigOnlyColumns],
@@ -231,7 +231,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('set search config', () => {
-    it('should update if config has only values and key is search config', (done) => {
+    it('should update when the config has only values and the key is a search config', (done) => {
       store.patchState({
         searchConfigs: [testConfigOnlyValues, testConfigOnlyColumns],
         currentSearchConfig: testConfigOnlyColumns,
@@ -251,7 +251,7 @@ describe('SearchConfigStore', () => {
 
   describe('set selected group key', () => {
     describe('columnSelectionVm$ selector', () => {
-      it('should update if config and selected key for config was set and new key is predefined', (done) => {
+      it('should update when a config and its selected key are set and the new key is predefined', (done) => {
         store.patchState({
           selectedGroupKey: testConfigValuesAndColumns.name,
           currentSearchConfig: testConfigValuesAndColumns,
@@ -268,7 +268,7 @@ describe('SearchConfigStore', () => {
         })
       })
 
-      it('should update if config and selected key for config was set and new key is custom group key', (done) => {
+      it('should update when a config and its selected key are set and the new key is a custom group key', (done) => {
         store.patchState({
           selectedGroupKey: testConfigValuesAndColumns.name,
           currentSearchConfig: testConfigValuesAndColumns,
@@ -288,7 +288,7 @@ describe('SearchConfigStore', () => {
     })
 
     describe('currentConfig$ selector', () => {
-      it('should update if only values config was selected and new key is search config', (done) => {
+      it('should update when an only-values config is selected and the new key is a search config', (done) => {
         store.patchState({
           selectedGroupKey: 'default',
           currentSearchConfig: testConfigOnlyValues,
@@ -328,7 +328,7 @@ describe('SearchConfigStore', () => {
     // a host predefined group key on the column side, so the header can only stay consistent if it
     // receives the exact `selectedGroupKey` the column store resolved (a name-based lookup alone could
     // confuse the saved config with the predefined group of the same name).
-    it('should keep the header selected group key in sync with a saved selection via the topic', () => {
+    it('should keep the header selected group key in sync with a saved selection when the column group store publishes the selection via the topic', () => {
       const columnStore = new SearchConfigStore(
         columngGroupSelectionStoreName,
         mockSearchConfigStoreTopic as any as SearchConfigTopic
@@ -364,7 +364,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('selectedGroupKey$ selector', () => {
-    it('should not update if config with only inputs is unset', (done) => {
+    it('should not update when the config with only inputs is unset', (done) => {
       store.patchState({
         fieldValues: {
           ...testConfigOnlyValues.values
@@ -384,7 +384,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should update if config with both inputs and columns is unset', (done) => {
+    it('should update when the config with both inputs and columns is unset', (done) => {
       store.patchState({
         searchConfigs: [testConfigValuesAndColumns],
         fieldValues: {
@@ -407,7 +407,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should not update if current config had values equal to new ones', () => {
+    it('should not update when the values of the current config equal the new ones', () => {
       store.patchState({
         fieldValues: {
           ...testConfigOnlyValues.values
@@ -425,7 +425,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should exercise updateFieldValues and updateDisplayedColumnsIds/updateViewMode branches', () => {
+    it('should exercise the updateFieldValues and updateDisplayedColumnsIds/updateViewMode branches when field values, columns, and view mode all differ', () => {
       store.patchState({
         ...initialState,
         fieldValues: { x: '1' },
@@ -522,7 +522,7 @@ describe('SearchConfigStore', () => {
 
   describe('update displayed columns', () => {
     describe('currentConfig$ selector', () => {
-      it('should unset config if current config has colums not equal to new ones', (done) => {
+      it('should unset the config when the columns of the current config differ from the new ones', (done) => {
         store.patchState({
           displayedColumnsIds: testConfigValuesAndColumns.columns,
           currentSearchConfig: testConfigValuesAndColumns,
@@ -539,7 +539,7 @@ describe('SearchConfigStore', () => {
     })
 
     describe('selectedGroupKey$ selector', () => {
-      it('should not update if config with only inputs is unset', () => {
+      it('should not update when the config with only inputs is unset', () => {
         store.patchState({
           displayedColumnsIds: testConfigOnlyValues.columns,
           currentSearchConfig: testConfigOnlyValues,
@@ -553,7 +553,7 @@ describe('SearchConfigStore', () => {
         })
       })
 
-      it('should update if config with both inputs and columns is unset', (done) => {
+      it('should update when the config with both inputs and columns is unset', (done) => {
         store.patchState({
           searchConfigs: [testConfigValuesAndColumns],
           displayedColumnsIds: testConfigValuesAndColumns.columns,
@@ -571,7 +571,7 @@ describe('SearchConfigStore', () => {
         })
       })
 
-      it('should not update if current config had columns equal to new ones', () => {
+      it('should not update when the columns of the current config equal the new ones', () => {
         store.patchState({
           displayedColumnsIds: testConfigValuesAndColumns.columns,
           currentSearchConfig: testConfigOnlyValues,
@@ -589,7 +589,7 @@ describe('SearchConfigStore', () => {
 
   describe('update view mode', () => {
     describe('pageData$ selector', () => {
-      it('should update if view mode changed', (done) => {
+      it('should update when the view mode changed', (done) => {
         store.patchState({
           viewMode: advancedViewMode
         })
@@ -604,7 +604,7 @@ describe('SearchConfigStore', () => {
     })
 
     describe('selectedGroupKey$ selector', () => {
-      it('should not update if current config had values equal to new ones', () => {
+      it('should not update when the values of the current config equal the new ones', () => {
         store.patchState({
           viewMode: testConfigOnlyValues.isAdvanced ? advancedViewMode : basicViewMode,
           currentSearchConfig: testConfigOnlyValues,
@@ -619,7 +619,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should send update message with all changes', (done) => {
+    it('should send an update message with all changes when a config is deleted', (done) => {
       store.patchState({
         ...initialState,
         currentSearchConfig: testConfigBase,
@@ -650,7 +650,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('update layout', () => {
-    it('should not update if layout did not change', () => {
+    it('should not update when the layout did not change', () => {
       store.patchState({
         ...initialState,
         layout: 'table'
@@ -663,7 +663,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should update if layout changed', (done) => {
+    it('should update when the layout changed', (done) => {
       store.patchState({
         ...initialState,
         layout: 'table'
@@ -679,7 +679,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('columnSelectionVm$ selector', () => {
-    it('should build the grouped options from the predefined keys and the saved configs', (done) => {
+    it('should build the grouped options from the predefined keys and the saved configs when the state holds a predefined key and a saved config', (done) => {
       store.patchState({
         selectedGroupKey: 'non-1',
         searchConfigs: [testConfigOnlyColumns],
@@ -704,7 +704,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('update config / selected group key helpers', () => {
-    it('should resolve currentSearchConfig helper for all branches', () => {
+    it('should resolve the currentSearchConfig helper when the state takes each supported shape', () => {
       const current = testConfigOnlyValues
       expect(
         (store as any).updateConfigBySelectedGroupKey(
@@ -774,7 +774,7 @@ describe('SearchConfigStore', () => {
       ).toBe(current)
     })
 
-    it('should resolve selectedGroupKey helper for all branches', () => {
+    it('should resolve the selectedGroupKey helper when the state takes each supported shape', () => {
       expect(
         (store as any).updateSelectedGroupKeyByConfig(
           {
@@ -840,7 +840,7 @@ describe('SearchConfigStore', () => {
   })
 
   describe('storeUpdate effect', () => {
-    it('should update state accordingly to the payload', (done) => {
+    it('should update the state to match the payload when a store update message is received', (done) => {
       const spy = jest.spyOn(secondStore, 'patchState')
 
       store.setSearchConfigs([testConfigBase, testConfigOnlyValues])
@@ -868,7 +868,7 @@ describe('SearchConfigStore', () => {
       )
     })
 
-    it('should send whole state from column group store if search config is not active', () => {
+    it('should send the whole state from the column group store when the search config is not active', () => {
       const spy = jest.spyOn(mockSearchConfigStoreTopic, 'publish')
       secondStore.sendUpdateMessage(
         {
@@ -894,7 +894,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should send partial state from search config store if column group is active', () => {
+    it('should send the partial state from the search config store when the column group is active', () => {
       const spy = jest.spyOn(mockSearchConfigStoreTopic, 'publish')
       store.sendUpdateMessage(
         {
@@ -918,7 +918,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should update whole state for search config store', (done) => {
+    it('should update the whole state for the search config store when a whole-state update message is received', (done) => {
       const spy = jest.spyOn(store, 'patchState')
 
       secondStore.sendUpdateMessage(
@@ -960,7 +960,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should update whole state for column group store', (done) => {
+    it('should update the whole state for the column group store when a whole-state update message is received', (done) => {
       const spy = jest.spyOn(secondStore, 'patchState')
 
       store.sendUpdateMessage(
@@ -1010,7 +1010,7 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should parse date values with toISOString and stringify plain values', () => {
+    it('should parse date values with toISOString and stringify plain values when parsing a mixed field value payload', () => {
       const dateValue = new Date('2024-03-05T12:00:00.000Z')
 
       expect(

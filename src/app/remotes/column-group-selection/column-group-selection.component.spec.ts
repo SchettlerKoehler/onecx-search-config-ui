@@ -244,7 +244,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   }))
 
   describe('setup', () => {
-    it('should init remote component', (done) => {
+    it('should init the remote component when the remote component config is set', (done) => {
       const config: RemoteComponentConfig = {
         appId: 'appId',
         productName: 'prodName',
@@ -266,7 +266,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('view model', () => {
-    it('should display only configs with columns in the store view model', async () => {
+    it('should display only configs with columns in the store view model when the store holds configs with and without columns', async () => {
       store.patchState({
         searchConfigs: [config, onlyValuesConfig, onlyColumnsConfig],
         nonSearchConfigGroupKeys: [],
@@ -281,7 +281,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       expect(vm.searchConfigsWithColumns.map((item) => item.name)).toEqual([config.name, onlyColumnsConfig.name])
     })
 
-    it('should normalize unique predefined group keys and trigger selected group updates', fakeAsync(() => {
+    it('should normalize unique predefined group keys and trigger selected group updates when the columns carry predefined group keys', fakeAsync(() => {
       const setSelectedGroupKeySpy = jest.spyOn(store, 'setSelectedGroupKey')
 
       component.columns = [
@@ -314,7 +314,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
     // The store emits the raw i18n group keys; the component's `vm$` translates them (and the
     // predefined leaf labels) reactively against the translate service, so a language change is
     // reflected without any store round-trip.
-    it('should translate the group headers and predefined leaves in the component view model', fakeAsync(() => {
+    it('should translate the group headers and predefined leaves in the component view model when the store emits group keys', fakeAsync(() => {
       const translateService = TestBed.inject(TranslateService)
       store.patchState({
         nonSearchConfigGroupKeys: ['full'],
@@ -349,7 +349,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('on selectedGroupKey change', () => {
-    it('should emit if config with columns was set', fakeAsync(() => {
+    it('should emit the group selection when the selected key matches a config with columns', fakeAsync(() => {
       const selectedGroupKey$ = new Subject<string>()
       const vm$ = new BehaviorSubject<any>({
         searchConfigsWithColumns: [onlyColumnsConfig],
@@ -400,7 +400,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
     }))
 
-    it('should emit if no search config group key was set', fakeAsync(() => {
+    it('should emit the group selection when the selected key matches a predefined group', fakeAsync(() => {
       const selectedGroupKey$ = new Subject<string>()
       const vm$ = new BehaviorSubject<any>({
         searchConfigsWithColumns: [],
@@ -588,7 +588,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('grouped options', () => {
-    it('should group the host column groups under the Predefined group key and the saved column configs under the Saved group key', (done) => {
+    it('should group the host column groups under the Predefined group key and the saved column configs under the Saved group key when both groups have items', (done) => {
       store.patchState({
         nonSearchConfigGroupKeys: ['default', 'full'],
         searchConfigs: [config, onlyColumnsConfig],
@@ -624,7 +624,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
     })
 
-    it('should exclude value-only configs from the Saved group', (done) => {
+    it('should exclude value-only configs from the Saved group when the store holds a value-only config', (done) => {
       store.patchState({
         nonSearchConfigGroupKeys: [],
         searchConfigs: [onlyColumnsConfig, onlyValuesConfig],
@@ -677,7 +677,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('select label and placeholder', () => {
-    it('should show the host placeholder key while nothing is selected', () => {
+    it('should show the host placeholder key when nothing is selected', () => {
       component.placeholderKey = 'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
 
       expect(component.selectLabel({ selectedGroupKey: undefined } as any)).toBe(
@@ -693,11 +693,11 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       )
     })
 
-    it('should show the fixed column group label once a group is selected', () => {
+    it('should show the fixed column group label when a group is selected', () => {
       expect(component.selectLabel({ selectedGroupKey: 'config-1' } as any)).toBe('COLUMN_GROUP_SELECTION.LABEL')
     })
 
-    it('should show the host placeholder while the selected key is the host custom group', () => {
+    it('should show the host placeholder when the selected key is the host custom group', () => {
       component.placeholderKey = 'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
 
       expect(component.selectLabel({ selectedGroupKey: 'custom', customGroupKey: 'custom' } as any)).toBe(
@@ -849,7 +849,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
       })
     }))
 
-    it('should render the delete affordance only for a non-readonly saved config with the DELETE permission', () => {
+    it('should render the delete affordance only for a non-readonly saved config when the DELETE permission is present', () => {
       component.permissions = ['SEARCHCONFIG#DELETE']
       expect(component.canDelete(config)).toBe(true)
       expect(component.canDelete(readonlyConfig)).toBe(false)
@@ -878,7 +878,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('Save As', () => {
-    it('should open the create dialog with columns saved and the column option unfrozen', fakeAsync(() => {
+    it('should open the create dialog with columns saved and the column option unfrozen when Save As is invoked', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
         of({
@@ -1285,7 +1285,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
     // M1: the fallback is a live selector, so once the header remote sets the shared store's `pageName`
     // (even after the column remote has already booted with the fallback in place) the next Save As
     // resolves the header's page name — and that value was set by the header, never the column remote.
-    it('should use the header page name for the next Save As once it arrives after the fallback', fakeAsync(() => {
+    it('should use the header page name for the next Save As when it arrives over the store after the fallback', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
         of({
@@ -1365,7 +1365,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
   })
 
   describe('load search configs', () => {
-    it('should fetch the saved configs once the base url, page name and mfe are available and store them', fakeAsync(() => {
+    it('should fetch the saved configs when the base url, page name and mfe are available and store them', fakeAsync(() => {
       const configs = [
         {
           name: 'config-1',
@@ -1728,7 +1728,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(iconSpan.classList.contains('pi-save')).toBe(true)
   })
 
-  it('should group the host column groups and the saved column configs in the opened panel', async () => {
+  it('should group the host column groups and the saved column configs in the opened panel when the select is opened', async () => {
     await patchConfigs([config, onlyColumnsConfig], ['default', 'full'])
 
     const h = await harness()
@@ -1759,7 +1759,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(await h.findSelectItem(onlyValuesConfig.name)).toBeNull()
   })
 
-  it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
+  it('should render the select and its opened panel inside the remote element with the style hooks when configs are available', async () => {
     await patchConfigs([config])
 
     const items = await openItems()
@@ -1822,7 +1822,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(await h.getDeleteButton(config.name)).toBeNull()
   })
 
-  it('should render no trash button for a read-only config', async () => {
+  it('should render no trash button when the config is read-only', async () => {
     await patchConfigs([config, readonlyConfig])
 
     const h = await harness()
@@ -1885,7 +1885,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(combobox.getAttribute('aria-describedby')).toBeNull()
   })
 
-  it('should show the full config name with a tooltip that appears on ellipsis', async () => {
+  it('should show the full config name with a tooltip that appears on ellipsis when a config is present', async () => {
     await patchConfigs([config])
 
     const h = await harness()
@@ -2080,7 +2080,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     )
   })
 
-  it('should hide the Save As button but still render the select without the SEARCHCONFIG#CREATE permission', async () => {
+  it('should hide the Save As button but still render the select when the SEARCHCONFIG#CREATE permission is missing', async () => {
     childComponent.permissions = ['SEARCHCONFIG#VIEW']
     await patchConfigs([config])
 

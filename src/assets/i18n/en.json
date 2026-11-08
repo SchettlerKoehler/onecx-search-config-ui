@@ -19,8 +19,6 @@
       "ARIA_LABEL": "Save as new search config"
     },
     "DELETE": {
-      "ARIA_LABEL": "Delete search config",
-      "TOOLTIP": "Delete search config",
       "DELETE_KEY_HINT": "Press Delete to remove"
     },
     "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",

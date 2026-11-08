@@ -223,10 +223,9 @@ export class OneCXColumnGroupSelectionComponent
   // otherwise a fallback derived from the application path. Because this is a live selector — not a
   // snapshot taken once at construction — the load and Save As both see the header's page name as soon
   // as it is delivered over the topic, and the fallback is never written to (or broadcast from) the
-  // shared store.
-  private resolvePageName() {
-    return this.searchConfigStore.select((state) => state.pageName ?? getLocation().applicationPath)
-  }
+  // shared store. It is created once as a field and shared by both callers rather than being rebuilt
+  // as a fresh selector on every `loadSearchConfigs()`/`onColumnGroupSaveAs()` call.
+  readonly pageName$ = this.searchConfigStore.select((state) => state.pageName ?? getLocation().applicationPath)
 
   // Load the saved configs once the remote base url, the page name and the current MFE are all
   // available. The `!isSearchConfigComponentActive$` gate is projected inside the `switchMap`, so while
@@ -239,7 +238,7 @@ export class OneCXColumnGroupSelectionComponent
       this.appStateService,
       this.searchConfigService,
       this.portalMessageService,
-      this.resolvePageName(),
+      this.pageName$,
       this.searchConfigStore.isSearchConfigComponentActive$.pipe(map((active) => !active))
     ).subscribe((searchConfigs) => {
       setTimeout(() => {
@@ -343,7 +342,7 @@ export class OneCXColumnGroupSelectionComponent
       this.portalMessageService,
       this.appStateService,
       this.searchConfigStore,
-      this.resolvePageName(),
+      this.pageName$,
       {
         searchConfigName: '',
         saveInputValues: false,

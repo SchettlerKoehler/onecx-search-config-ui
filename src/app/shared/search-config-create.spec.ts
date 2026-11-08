@@ -60,7 +60,7 @@ describe('search-config-create', () => {
   describe('loadSearchConfigInfos', () => {
     const baseUrl = of({} as any)
 
-    it('should fetch the configs and emit them once all inputs are available', async () => {
+    it('should fetch the configs and emit them when all inputs are available', async () => {
       getSearchConfigInfos.mockReturnValue(of({ configs: [testConfig] }))
 
       const configs = await lastValueFrom(
@@ -86,7 +86,7 @@ describe('search-config-create', () => {
       consoleSpy.mockRestore()
     })
 
-    it('should not fetch while the load guard is false', () => {
+    it('should not fetch when the load guard is false', () => {
       const guard = new BehaviorSubject(false)
       getSearchConfigInfos.mockReturnValue(of({ configs: [testConfig] }))
 
@@ -104,7 +104,7 @@ describe('search-config-create', () => {
       expect(emissions).toStrictEqual([])
     })
 
-    it('should fetch once the load guard flips to true', () => {
+    it('should fetch when the load guard flips to true', () => {
       const guard = new BehaviorSubject(false)
       getSearchConfigInfos.mockReturnValue(of({ configs: [testConfig] }))
 
@@ -126,7 +126,7 @@ describe('search-config-create', () => {
       subscription.unsubscribe()
     })
 
-    it('should cancel and discard a fallback-page fetch once the header becomes active', () => {
+    it('should cancel and discard a fallback-page fetch when the header becomes active', () => {
       // The gate is projected inside the switchMap, so when the header becomes active (the guard
       // flips to false) before the in-flight fallback-page fetch responds, the stale request is
       // cancelled and its result discarded — a plain `filter` would have let it store the wrong
@@ -167,7 +167,7 @@ describe('search-config-create', () => {
       frozeColumnSaveOptionExplanation: 'EXPLANATION'
     }
 
-    it('should open the create dialog with the resolved inputs', async () => {
+    it('should open the create dialog with the resolved inputs when the create flow is invoked', async () => {
       openDialog.mockReturnValue(of(undefined))
 
       await lastValueFrom(

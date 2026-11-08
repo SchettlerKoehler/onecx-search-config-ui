@@ -19,8 +19,6 @@
       "ARIA_LABEL": "Als neue Suchkonfiguration speichern"
     },
     "DELETE": {
-      "ARIA_LABEL": "Suchkonfiguration löschen",
-      "TOOLTIP": "Suchkonfiguration löschen",
       "DELETE_KEY_HINT": "Drücken Sie Löschen zum Entfernen"
     },
     "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",

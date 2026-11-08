@@ -32,7 +32,7 @@
               <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
                 item.label
               }}</span>
-              @if (!item.isPredefined && canDelete(item.config)) {
+              @if (canDelete(item.config)) {
                 <p-button
                   class="sc-search-config-delete"
                   [icon]="deleteIcon"
