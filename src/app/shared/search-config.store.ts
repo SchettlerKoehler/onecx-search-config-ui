@@ -105,10 +105,6 @@ export interface ColumnSelectionViewModel {
 
   searchConfigsWithColumns: SearchConfigInfo[]
   selectedGroupKey: string | undefined
-  /** The header's current config (the saved config whose columns drive the displayed columns). */
-  currentConfig: SearchConfigInfo | undefined
-  /** True when the current config is retained but a stored aspect no longer matches the page. */
-  currentConfigModified: boolean
   /**
    * True when the saved config the select points at (`selectedGroupKey`) is retained but a stored
    * aspect no longer matches the page — the config the `*` marker and the "Modified" tooltip in the
@@ -406,8 +402,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
       selectedGroupKey: state.selectedGroupKey,
       customGroupKey: state.customGroupKey,
-      currentConfig: state.currentSearchConfig,
-      currentConfigModified: isSearchConfigModified(state.currentSearchConfig, pageData),
       selectedConfigModified: isSearchConfigModified(selectedConfig, pageData),
       options: [
         {

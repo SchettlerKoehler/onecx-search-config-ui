@@ -152,6 +152,33 @@ describe('search-config.utils', () => {
       ).toBe(false)
     })
 
+    it('should not mark a values-only config modified by its stored view mode when the page reports no view mode', () => {
+      // Standalone column-group deployment: no header remote, so `pageData.viewMode` is undefined.
+      // The stored view mode must not be compared — otherwise the config would be reported modified
+      // by an aspect the page does not track.
+      expect(
+        isSearchConfigModified(valuesConfig, {
+          fieldValues: { key_1: 'val_1', key_2: 'val_2' },
+          displayedColumnsIds: []
+        })
+      ).toBe(false)
+      expect(
+        isSearchConfigModified(advancedValuesConfig, {
+          fieldValues: { key_1: 'val_1', key_2: 'val_2' },
+          displayedColumnsIds: []
+        })
+      ).toBe(false)
+    })
+
+    it('should be modified when a values-only config field value differs even if the page reports no view mode', () => {
+      expect(
+        isSearchConfigModified(valuesConfig, {
+          fieldValues: { key_1: 'val_1', key_2: 'val_2-changed' },
+          displayedColumnsIds: []
+        })
+      ).toBe(true)
+    })
+
     it('should be modified when a columns-only config displayed columns differ', () => {
       expect(
         isSearchConfigModified(columnsConfig, {
@@ -207,6 +234,18 @@ describe('search-config.utils', () => {
         isSearchConfigModified(combinedConfig, {
           fieldValues: { key_1: 'val_1', key_2: 'val_2' },
           viewMode: basicViewMode,
+          displayedColumnsIds: ['col_2', 'col_1']
+        })
+      ).toBe(false)
+    })
+
+    it('should be false when a combined config matches its values and columns even if the page reports no view mode', () => {
+      // A standalone column-group deployment: the page does not track view mode. The combined config
+      // still has its values and columns matching, so it must not be reported modified just because
+      // `pageData.viewMode` is undefined.
+      expect(
+        isSearchConfigModified(combinedConfig, {
+          fieldValues: { key_1: 'val_1', key_2: 'val_2' },
           displayedColumnsIds: ['col_2', 'col_1']
         })
       ).toBe(false)

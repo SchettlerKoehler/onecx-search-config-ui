@@ -1980,11 +1980,9 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     await settle()
 
     const vm = await firstValueFrom(childStore.columnSelectionVm$)
-    // The header marks the retained current config (Sales) and the column select marks its selection
-    // (Wide) — both are modified, and they are two different configs.
-    expect(vm.currentConfig).toBe(sales)
+    // The column select marks its selection (Wide) modified. The header marks its retained current
+    // config (Sales) modified — both are modified, and they are two different configs.
     expect(vm.selectedConfigModified).toBe(true)
-    expect(vm.currentConfigModified).toBe(true)
 
     // The selection was applied and the header's current config was retained, not swapped.
     expect(childStore.state().selectedGroupKey).toBe(wide.name)

@@ -36,7 +36,10 @@ export function areValuesEqual(v1: FieldValues, v2: FieldValues): boolean {
  * any aspect it stores differs, by value comparison, from the page's current state: the criteria
  * (field values plus view mode) when it stores values, and the displayed columns when it stores
  * columns. Aspects the config does not store are ignored, so a config with only values is never
- * modified by a column change and vice versa.
+ * modified by a column change and vice versa. The view-mode comparison is only applied when the page
+ * reports a view mode — when it does not (a standalone column-group deployment without the header
+ * remote leaves `state.viewMode` undefined) the stored view mode is not a stored aspect of that page
+ * and cannot be reported modified.
  */
 export function isSearchConfigModified(config: SearchConfigInfo | undefined, pageData: SearchConfigPageData): boolean {
   if (config === undefined) return false
@@ -45,7 +48,7 @@ export function isSearchConfigModified(config: SearchConfigInfo | undefined, pag
   if (hasValues(config)) {
     modified =
       !areValuesEqual(config.values, pageData.fieldValues ?? {}) ||
-      (config.isAdvanced ? advancedViewMode : basicViewMode) !== pageData.viewMode
+      (pageData.viewMode !== undefined && (config.isAdvanced ? advancedViewMode : basicViewMode) !== pageData.viewMode)
   }
   if (hasColumns(config) && !areColumnsEqual(config.columns, pageData.displayedColumnsIds)) {
     modified = true

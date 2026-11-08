@@ -607,8 +607,10 @@ describe('SearchConfigStore', () => {
     describe('currentConfig$ selector', () => {
       it('should keep the config and mark it modified when its columns differ from the new ones', (done) => {
         store.patchState({
+          searchConfigs: [testConfigValuesAndColumns],
           displayedColumnsIds: testConfigValuesAndColumns.columns,
           currentSearchConfig: testConfigValuesAndColumns,
+          selectedGroupKey: testConfigValuesAndColumns.name,
           columnGroupComponentActive: true
         })
 
@@ -622,7 +624,9 @@ describe('SearchConfigStore', () => {
         })
 
         store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-          expect(vm.currentConfigModified).toBe(true)
+          // The select points at the same config (via `selectedGroupKey`), so the selection is
+          // reported modified for the same reason — the stored columns no longer match.
+          expect(vm.selectedConfigModified).toBe(true)
         })
       })
     })
@@ -797,27 +801,30 @@ describe('SearchConfigStore', () => {
       })
     })
 
-    it('should mark the current config modified when a columns-only config displayed columns differ', (done) => {
+    it('should mark the selected config modified when a columns-only config displayed columns differ', (done) => {
       store.patchState({
+        searchConfigs: [testConfigOnlyColumns],
         currentSearchConfig: testConfigOnlyColumns,
+        selectedGroupKey: testConfigOnlyColumns.name,
         displayedColumnsIds: ['col_1']
       })
 
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-        expect(vm.currentConfig).toBe(testConfigOnlyColumns)
-        expect(vm.currentConfigModified).toBe(true)
+        expect(vm.selectedConfigModified).toBe(true)
         done()
       })
     })
 
-    it('should not mark the current config modified when a columns-only config matches the displayed columns', (done) => {
+    it('should not mark the selected config modified when a columns-only config matches the displayed columns', (done) => {
       store.patchState({
+        searchConfigs: [testConfigOnlyColumns],
         currentSearchConfig: testConfigOnlyColumns,
+        selectedGroupKey: testConfigOnlyColumns.name,
         displayedColumnsIds: ['col_2', 'col_1']
       })
 
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
-        expect(vm.currentConfigModified).toBe(false)
+        expect(vm.selectedConfigModified).toBe(false)
         done()
       })
     })
