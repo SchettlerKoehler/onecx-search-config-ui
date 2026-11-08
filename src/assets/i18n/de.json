@@ -8,16 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "SAVE_EDIT": {
-      "LABEL": "Speichern",
-      "ARIA_LABEL": "Suchkonfiguration speichern",
-      "TOOLTIP": "Aktuell bearbeitete Suchkonfiguration speichern"
-    },
-    "CANCEL_EDIT": {
-      "LABEL": "Abbrechen",
-      "ARIA_LABEL": "Suchkonfiguration abbrechen",
-      "TOOLTIP": "Bearbeitung der Suchkonfiguration abbrechen"
-    },
     "SELECT": {
       "LABEL": "Suchkonfiguration",
       "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
@@ -28,13 +18,7 @@
       "LABEL": "Speichern unter",
       "ARIA_LABEL": "Als neue Suchkonfiguration speichern"
     },
-    "EDIT": {
-      "ARIA_LABEL": "Suchkonfiguration bearbeiten",
-      "TOOLTIP": "Suchkonfiguration bearbeiten"
-    },
     "DELETE": {
-      "ARIA_LABEL": "Suchkonfiguration löschen",
-      "TOOLTIP": "Suchkonfiguration löschen",
       "DELETE_KEY_HINT": "Drücken Sie Löschen zum Entfernen"
     },
     "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",
@@ -45,20 +29,12 @@
     "TABLE_VIEW_INACTIVE": "*Die Tabellenansicht ist inaktiv. Aktivieren Sie sie, um Suchkonfigurationen mit Spalten zu speichern, zu laden und zu bearbeiten",
     "CREATE_EDIT_DIALOG": {
       "CREATE_HEADER": "Suchkonfiguration erstellen",
-      "EDIT_HEADER": "Suchkonfiguration bearbeiten",
       "CONFIRM": "Bestätigen",
       "CANCEL": "Abbrechen",
       "CREATE_SUCCESS": "Suchkonfiguration erfolgreich hinzugefügt",
-      "CREATE_FAILURE": "Fehler beim Erstellen der Suchkonfiguration",
-      "EDIT_SUCCESS": "Suchkonfiguration erfolgreich bearbeitet",
-      "EDIT_FAILURE": "Fehler beim Bearbeiten der Suchkonfiguration"
+      "CREATE_FAILURE": "Fehler beim Erstellen der Suchkonfiguration"
     },
-    "DELETE_DIALOG": {
-      "HEADER": "Suchkonfiguration löschen",
-      "MESSAGE": "Sind Sie sicher, dass Sie die Suchkonfiguration {{config}} löschen möchten?",
-      "CONFIRM": "Bestätigen",
-      "CANCEL": "Abbrechen"
-    },
+    "LOAD_FAILURE": "Fehler beim Laden der Suchkonfigurationen",
     "DELETE_CONFIRM": {
       "HEADER": "Suchkonfiguration löschen?",
       "MESSAGE": "Möchten Sie '{{config}}' wirklich löschen? Das kann nicht rückgängig gemacht werden.",
@@ -66,23 +42,20 @@
       "CANCEL": "Abbrechen",
       "SUCCESS": "Suchkonfiguration '{{config}}' gelöscht."
     },
-    "DELETE_SUCCESS": "Suchkonfiguration erfolgreich gelöscht",
-    "DELETE_FAILURE": "Fehler beim Löschen der Suchkonfiguration",
-    "FETCH_FAILURE": "Fehler beim Laden der Suchkonfiguration"
+    "DELETE_FAILURE": "Fehler beim Löschen der Suchkonfiguration"
   },
   "COLUMN_GROUP_SELECTION": {
-    "EDITING": "{{group}} Suchkonfiguration bearbeiten",
-    "ACTIVE": "Aktiv: {{group}}",
-    "COLUMN_GROUP_LIST": "Säulengruppen",
-    "SELECT": {
-      "LABEL": "Auswählen",
-      "ARIA_LABEL": "Spaltengruppe auswählen",
-      "TOOLTIP": "Spaltengruppe auswählen"
+    "LABEL": "Spaltengruppe",
+    "GROUPS": {
+      "PREDEFINED": "Vordefiniert",
+      "SAVED": "Gespeichert"
     },
-    "MANAGE": {
-      "LABEL": "Spaltengruppen verwalten",
-      "ARIA_LABEL": "Spaltengruppen verwalten",
-      "TOOLTIP": "Spaltengruppen verwalten"
+    "SELECT": {
+      "PLACEHOLDER": "Spaltengruppe"
+    },
+    "SAVE_AS": {
+      "LABEL": "Speichern unter",
+      "ARIA_LABEL": "Als neue Spaltengruppe speichern"
     }
   },
   "SCAFFOLD_SEARCH": {

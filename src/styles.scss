@@ -5,12 +5,6 @@
 /* portal core */
 @use 'node_modules/@onecx/angular-accelerator/assets/styles.scss';
 
-// fix popover styles, check in next version of primeNG if this is still needed
-.p-popover:before,
-.p-popover:after {
-  right: 1rem !important;
-}
-
 /*
  * Search-config design tokens.
  *
@@ -27,7 +21,7 @@
   /* Corner radius of the control, matched to the PrimeNG select token. */
   --onecx-search-config-radius: var(--p-select-border-radius);
   /* Control border color — reserved for a later ticket (no selector reads it yet, so applying the
-   * select border color via this variable would be dead CSS, like the marker/group-header tokens). */
+   * select border color via this variable would be dead CSS, like the modified-marker token). */
   --onecx-search-config-border-color: var(--p-select-border-color);
   /* Maximum height of the opened option list (overlay) before it scrolls. Matches the prototype. */
   --onecx-search-config-panel-max-height: 16rem;
@@ -37,24 +31,28 @@
   --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
   /* Color of the "modified" marker on a config row (used by a later ticket). */
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
-  /* Color of a config option-group header in the list (used by a later ticket). */
+  /* Color of a config option-group header in the list (used by the column remote's grouped headers). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
   /* Width of the reusable delete-confirm dialog (applied via PortalDialogConfig.width). */
   --onecx-search-config-dialog-width: 30rem;
 }
 
 /*
- * Search header remote: the config select joined to the Save As button.
+ * Search header and column-group remotes: the same joined config select + Save As.
  *
- * Selectors are rooted at the remote's host element (ocx-search-config-component, registered as
- * a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
- * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the
- * host element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips
- * append to `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The
- * delete-confirm dialog is portaled outside the remote element and is sized and reached by the
- * host through data-style-id scoping (see the README).
+ * Both remotes reuse the `sc-search-config-*` style hooks and the same design tokens, so their host
+ * selectors are grouped into one rule. Selectors are rooted at the remote's host element (registered
+ * as a custom element) — never ::ng-deep, never unscoped global selectors. The option-list panel
+ * renders inside <p-select> (PrimeNG's default `self` appendTo), so it is a descendant of the host
+ * element and is reached through the stable panelStyleClass / styleClass hooks. Tooltips append to
+ * `body` (forced: PrimeNG Tooltip only positions correctly with `body`/`target`). The delete-confirm
+ * dialog is portaled outside the remote element and is sized and reached by the host through
+ * data-style-id scoping (see the README). The only difference between the remotes is the grouped
+ * option headers ("Predefined" / "Saved"), which only the column remote renders; those are styled in
+ * a column-only rule below.
  */
-ocx-search-config-component {
+ocx-search-config-component,
+ocx-column-group-selection-component {
   .sc-search-config-group {
     width: var(--onecx-search-config-width);
 
@@ -110,6 +108,24 @@ ocx-search-config-component {
 
     .p-button {
       height: 100%;
+    }
+  }
+}
+
+/*
+ * Column-group remote only: the grouped option headers ("Predefined" / "Saved"). These exist only in
+ * the column remote's option list, so they are styled on its host element alone rather than in the
+ * shared rule above. PrimeNG has no token for the custom `#group` template header, so the app-owned
+ * group-header color drives the text color and the PrimeNG option-group weight/transform tokens give
+ * the header its look.
+ */
+ocx-column-group-selection-component {
+  .sc-search-config-panel {
+    .sc-search-config-group-header {
+      display: block;
+      color: var(--onecx-search-config-group-header-color);
+      text-transform: uppercase;
+      font-weight: var(--p-select-option-group-font-weight);
     }
   }
 }

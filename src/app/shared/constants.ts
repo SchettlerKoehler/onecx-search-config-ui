@@ -6,8 +6,11 @@ export const basicViewMode = 'basic'
 export const searchConfigStoreName = 'ocx-search-config-component-store'
 export const columngGroupSelectionStoreName = 'ocx-column-group-selection-component-store'
 
-/** Fixed id of the Save As button joined to the config select (stable style/test anchor). */
+/** Fixed id of the Save As button joined to the search header config select (stable style/test anchor). */
 export const SEARCH_CONFIG_SAVE_AS_BUTTON_ID = 'ocx-search-config-save-as-button'
+
+/** Fixed id of the Save As button joined to the column-group config select (stable style/test anchor). */
+export const COLUMN_GROUP_SAVE_AS_BUTTON_ID = 'ocx-column-group-save-as-button'
 
 /**
  * Fixed id of the Delete button in the delete confirm dialog. Cross-remote contract: the column

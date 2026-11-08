@@ -8,16 +8,6 @@
     }
   },
   "SEARCH_CONFIG": {
-    "SAVE_EDIT": {
-      "LABEL": "Save",
-      "ARIA_LABEL": "Save search config",
-      "TOOLTIP": "Save currently edited search config"
-    },
-    "CANCEL_EDIT": {
-      "LABEL": "Cancel",
-      "ARIA_LABEL": "Cancel search config edit",
-      "TOOLTIP": "Stop editing search config"
-    },
     "SELECT": {
       "LABEL": "Search Config",
       "NO_CONFIGS_LABEL": "No search configs",
@@ -28,13 +18,7 @@
       "LABEL": "Save As",
       "ARIA_LABEL": "Save as new search config"
     },
-    "EDIT": {
-      "ARIA_LABEL": "Edit search config",
-      "TOOLTIP": "Edit search config"
-    },
     "DELETE": {
-      "ARIA_LABEL": "Delete search config",
-      "TOOLTIP": "Delete search config",
       "DELETE_KEY_HINT": "Press Delete to remove"
     },
     "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",
@@ -45,20 +29,12 @@
     "TABLE_VIEW_INACTIVE": "*Table view is inactive. Enable it to save, load and edit search configs with columns",
     "CREATE_EDIT_DIALOG": {
       "CREATE_HEADER": "Create search config",
-      "EDIT_HEADER": "Edit search config",
       "CONFIRM": "Confirm",
       "CANCEL": "Cancel",
       "CREATE_SUCCESS": "Successfully added search config",
-      "CREATE_FAILURE": "Failed to add search config",
-      "EDIT_SUCCESS": "Successfully edited search config",
-      "EDIT_FAILURE": "Failed to edit search config"
+      "CREATE_FAILURE": "Failed to add search config"
     },
-    "DELETE_DIALOG": {
-      "HEADER": "Delete search config",
-      "MESSAGE": "Are you sure you want to delete search config {{config}}",
-      "CONFIRM": "Confirm",
-      "CANCEL": "Cancel"
-    },
+    "LOAD_FAILURE": "Failed to load search configs",
     "DELETE_CONFIRM": {
       "HEADER": "Delete search config?",
       "MESSAGE": "Are you sure you want to delete '{{config}}'? This cannot be undone.",
@@ -66,23 +42,20 @@
       "CANCEL": "Cancel",
       "SUCCESS": "Search config '{{config}}' deleted."
     },
-    "DELETE_SUCCESS": "Successfully deleted search config",
-    "DELETE_FAILURE": "Failed to delete search config",
-    "FETCH_FAILURE": "Failed to load search config"
+    "DELETE_FAILURE": "Failed to delete search config"
   },
   "COLUMN_GROUP_SELECTION": {
-    "EDITING": "Editing: {{group}}",
-    "ACTIVE": "Active: {{group}}",
-    "COLUMN_GROUP_LIST": "Column groups",
-    "SELECT": {
-      "LABEL": "Select",
-      "ARIA_LABEL": "Select column group",
-      "TOOLTIP": "Select column group"
+    "LABEL": "Column group",
+    "GROUPS": {
+      "PREDEFINED": "Predefined",
+      "SAVED": "Saved"
     },
-    "MANAGE": {
-      "LABEL": "Manage column groups",
-      "ARIA_LABEL": "Manage column groups",
-      "TOOLTIP": "Manage column groups"
+    "SELECT": {
+      "PLACEHOLDER": "Column group"
+    },
+    "SAVE_AS": {
+      "LABEL": "Save As",
+      "ARIA_LABEL": "Save as new column group"
     }
   },
   "SCAFFOLD_SEARCH": {

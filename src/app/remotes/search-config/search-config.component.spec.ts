@@ -202,11 +202,11 @@ describe('OneCXSearchConfigComponent', () => {
     store = TestBed.inject(SearchConfigStore)
   })
 
-  it('should create', () => {
+  it('should create the component when it is instantiated', () => {
     expect(component).toBeTruthy()
   })
 
-  it('should update store on view mode input set', fakeAsync(() => {
+  it('should update the store view mode when the view mode input is set', fakeAsync(() => {
     const spy = jest.spyOn(store, 'updateViewMode')
 
     component.viewMode = basicViewMode
@@ -215,7 +215,7 @@ describe('OneCXSearchConfigComponent', () => {
     expect(spy).toHaveBeenCalledWith(basicViewMode)
   }))
 
-  it('should update store on page name input set', fakeAsync(() => {
+  it('should update the store page name when the page name input is set', fakeAsync(() => {
     const spy = jest.spyOn(store, 'setPageName')
 
     component.pageName = 'my-page'
@@ -224,7 +224,7 @@ describe('OneCXSearchConfigComponent', () => {
     expect(spy).toHaveBeenCalledWith('my-page')
   }))
 
-  it('should update store on current field values input set', fakeAsync(() => {
+  it('should update the store field values when the current field values input is set', fakeAsync(() => {
     const spy = jest.spyOn(store, 'updateFieldValues')
 
     component.currentFieldValues = { k: 'v' }
@@ -233,13 +233,13 @@ describe('OneCXSearchConfigComponent', () => {
     expect(spy).toHaveBeenCalledWith({ k: 'v' })
   }))
 
-  it('should unsubscribe its subscriptions on destroy', () => {
+  it('should unsubscribe its subscriptions when the component is destroyed', () => {
     expect(() => component.ngOnDestroy()).not.toThrow()
     expect(() => component.ngOnDestroy()).not.toThrow()
   })
 
   describe('setup', () => {
-    it('should init remote component', (done) => {
+    it('should init the remote component when the remote component config is set', (done) => {
       const config: RemoteComponentConfig = {
         appId: 'appId',
         productName: 'prodName',
@@ -317,7 +317,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(localComponent).toBeTruthy()
     }))
 
-    it('should set search configs on page info update', fakeAsync(() => {
+    it('should set the search configs when the page info is updated', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const configs = [
         {
@@ -375,9 +375,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: false,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -419,9 +417,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'list',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -472,9 +468,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -514,9 +508,7 @@ describe('OneCXSearchConfigComponent', () => {
           selectedGroupKey: 'default',
           isColumnGroupComponentActive: true,
           layout: 'table',
-          currentConfig: undefined,
-          editMode: false,
-          isInChargeOfEdit: false
+          currentConfig: undefined
         } as any)
         tick(500)
 
@@ -562,9 +554,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -572,7 +562,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(setSpy).toHaveBeenCalledTimes(0)
     }))
 
-    it('should add and set config if create was confirmed', fakeAsync(() => {
+    it('should add and set the config when the create was confirmed', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const addSpy = jest.spyOn(store, 'addSearchConfig')
       const setSpy = jest.spyOn(store, 'setCurrentConfig')
@@ -615,9 +605,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -629,7 +617,7 @@ describe('OneCXSearchConfigComponent', () => {
       expect(setSpy).toHaveBeenCalledWith(config)
     }))
 
-    it('should save inputs and viewMode', fakeAsync(() => {
+    it('should save the input values and the view mode when the create result keeps the input values', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
       jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
@@ -667,9 +655,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -723,9 +709,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -742,7 +726,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
-    it('should save columns', fakeAsync(() => {
+    it('should save the displayed columns when the create result keeps the columns', fakeAsync(() => {
       const appState = TestBed.inject(AppStateService)
       const createCallSpy = jest.spyOn(searchConfigServiceSpy, 'createSearchConfig').mockReturnValue(of({} as any))
       jest.spyOn(appState.currentMfe$, 'asObservable').mockReturnValue(
@@ -780,9 +764,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -839,9 +821,7 @@ describe('OneCXSearchConfigComponent', () => {
         selectedGroupKey: 'default',
         isColumnGroupComponentActive: true,
         layout: 'table',
-        currentConfig: undefined,
-        editMode: false,
-        isInChargeOfEdit: false
+        currentConfig: undefined
       } as any)
       tick(500)
 
@@ -958,53 +938,6 @@ describe('OneCXSearchConfigComponent', () => {
     }))
   })
 
-  describe('on dataToRevert change', () => {
-    it('should not emit if data does not contain viewMode', fakeAsync(() => {
-      const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
-
-      store.patchState({
-        dataToRevert: {
-          fieldValues: {
-            k: 'v'
-          },
-          viewMode: undefined,
-          displayedColumnsIds: ['col-2'],
-          columnGroupKey: 'default'
-        }
-      })
-
-      tick(500)
-
-      expect(emitterSpy).toHaveBeenCalledTimes(0)
-    }))
-
-    it('should emit the reverted data with an undefined name when field values and view mode are present', fakeAsync(() => {
-      const emitterSpy = jest.spyOn(component.searchConfigSelected, 'emit')
-
-      store.patchState({
-        dataToRevert: {
-          fieldValues: {
-            k: 'v'
-          },
-          viewMode: basicViewMode,
-          displayedColumnsIds: ['col-1'],
-          columnGroupKey: 'default'
-        }
-      })
-
-      tick(500)
-
-      expect(emitterSpy).toHaveBeenCalledWith({
-        name: undefined,
-        fieldValues: {
-          k: 'v'
-        },
-        displayedColumnsIds: ['col-1'],
-        viewMode: basicViewMode
-      })
-    }))
-  })
-
   describe('on currentConfig change', () => {
     it('should emit undefined when no config is selected', fakeAsync(() => {
       const localFixture = TestBed.createComponent(OneCXSearchConfigComponent)
@@ -1055,7 +988,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
-    it('should emit only values config', fakeAsync(() => {
+    it('should emit the values and the displayed columns only when a values-only config is selected', fakeAsync(() => {
       const localFixture = TestBed.createComponent(OneCXSearchConfigComponent)
       const localComponent = localFixture.componentInstance
       localFixture.detectChanges()
@@ -1084,7 +1017,7 @@ describe('OneCXSearchConfigComponent', () => {
       })
     }))
 
-    it('should emit only columns config', fakeAsync(() => {
+    it('should emit the columns and the displayed field values when a columns-only config is selected', fakeAsync(() => {
       const localFixture = TestBed.createComponent(OneCXSearchConfigComponent)
       const localComponent = localFixture.componentInstance
       localFixture.detectChanges()
@@ -1331,7 +1264,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(iconSpan.classList.contains('pi-save')).toBe(true)
   })
 
-  it('should expose the config select label to the inner combobox', async () => {
+  it('should expose the config select label to the inner combobox when a config is available', async () => {
     await patchConfigs([config])
 
     // The <label> is wired to the select through [ariaLabelledBy] on the <p-select> host; PrimeNG
@@ -1400,7 +1333,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(await h.findSelectItem(onlyColumnsConfig.name)).toBeNull()
   })
 
-  it('should render the select and its opened panel inside the remote element with the style hooks', async () => {
+  it('should render the select and its opened panel inside the remote element with the style hooks when configs are available', async () => {
     await patchConfigs([config])
 
     const items = await openItems()
@@ -1479,37 +1412,6 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(saveSpy).toHaveBeenCalled()
   })
 
-  it('should disable the config select when the column remote is in edit mode', async () => {
-    await patchConfigs([config])
-    childStore.patchState({
-      editMode: true
-    })
-    await delay(80)
-    hostFixture.detectChanges()
-    await hostFixture.whenStable()
-
-    // The `[disabled]` guard (`vm.searchConfigs.length === 0 || vm.editMode`) forces the select closed
-    // while another remote holds the edit lock, so a picked row can no longer desync from the applied
-    // `currentConfig` (which `setCurrentConfig` ignores in edit mode).
-    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]')
-    expect(combobox.getAttribute('aria-disabled')).toBe('true')
-  })
-
-  it('should disable the Save As button when the column remote is in edit mode', async () => {
-    await patchConfigs([config])
-    childStore.patchState({
-      editMode: true
-    })
-    await delay(80)
-    hostFixture.detectChanges()
-    await hostFixture.whenStable()
-
-    const saveAsButton = hostFixture.nativeElement.querySelector(
-      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
-    ) as HTMLButtonElement
-    expect(saveAsButton.disabled).toBe(true)
-  })
-
   it('should delete the focused option when Delete is pressed on the open select combobox', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
 
@@ -1545,7 +1447,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(deleteEvent.defaultPrevented).toBe(true)
   })
 
-  it('should ignore a non-Delete key on the open select combobox', async () => {
+  it('should not delete via the keyboard path when a non-Delete key is pressed on the open select combobox', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
     await patchConfigs([config])
 
@@ -1616,7 +1518,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(deleteSpy).not.toHaveBeenCalled()
   })
 
-  it('should show the full config name with a tooltip that appears on ellipsis', async () => {
+  it('should show the full config name with a tooltip that appears on ellipsis when a config is present', async () => {
     await patchConfigs([config])
 
     // The row name renders the full config name and carries the `pTooltip` directive wired to the same
@@ -1686,7 +1588,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(state.displayedColumnsIds).toEqual(pageDisplayedColumnsIds)
   })
 
-  it('should show the filter placeholder and the no-match text for a non-matching filter', async () => {
+  it('should show the filter placeholder and the no-match text when the filter matches no config', async () => {
     await patchConfigs([config, onlyValuesConfig])
 
     // Open the panel so the in-panel filter input is rendered.
@@ -1708,7 +1610,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(emptyMessage!.textContent.trim()).toBe('No matching configs')
   })
 
-  it('should render the trash button inside a deletable row and none inside a read-only row', async () => {
+  it('should render the trash button inside a deletable row and none inside a read-only row when a read-only config is present', async () => {
     await patchConfigs([config, readonlyConfig])
 
     // The panel renders one row per option; the read-only config's row renders no trash button.
@@ -1728,7 +1630,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     )
   })
 
-  it('should hide the Save As button but still render the select without the SEARCHCONFIG#CREATE permission', async () => {
+  it('should hide the Save As button but still render the select when the SEARCHCONFIG#CREATE permission is missing', async () => {
     // The Save As addon is gated by `SEARCHCONFIG#CREATE`; with only `SEARCHCONFIG#VIEW` the group and
     // select render but the addon (and the button inside it) do not.
     childComponent.permissions = ['SEARCHCONFIG#VIEW']
@@ -1760,7 +1662,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
 })
 
 describe('search-config zone-based change detection', () => {
-  it('boots the remote providers and injects a real NgZone (not NoopNgZone)', async () => {
+  it('should boot the remote providers and inject a real NgZone (not NoopNgZone) when the remote is mounted', async () => {
     const shellMocks = [
       provideAppConfigServiceMock(),
       provideAppStateServiceMock(),
@@ -1793,7 +1695,7 @@ describe('search-config zone-based change detection', () => {
     app.destroy()
   }, 20000)
 
-  it('reuses the shell NgZone instead of creating a private one', async () => {
+  it('should reuse the shell NgZone instead of creating a private one when the shell publishes its NgZone before the remote boots', async () => {
     const shellZone = new NgZone({})
     // The shell publishes its NgZone here before the remote boots; the remote's
     // providers must re-provide this same instance (see createRemoteProviders).
