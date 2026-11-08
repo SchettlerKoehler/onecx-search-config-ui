@@ -8,7 +8,7 @@ import { FieldValues, UnparsedFieldValues } from './search-config.store'
 export type SearchConfigPageData = {
   fieldValues?: FieldValues
   viewMode?: basicViewModeType | advancedViewModeType
-  displayedColumnsIds: Array<string>
+  displayedColumnsIds?: Array<string>
 }
 
 export function hasValues(config: SearchConfigInfo): boolean {
@@ -36,21 +36,29 @@ export function areValuesEqual(v1: FieldValues, v2: FieldValues): boolean {
  * any aspect it stores differs, by value comparison, from the page's current state: the criteria
  * (field values plus view mode) when it stores values, and the displayed columns when it stores
  * columns. Aspects the config does not store are ignored, so a config with only values is never
- * modified by a column change and vice versa. The view-mode comparison is only applied when the page
- * reports a view mode — when it does not (a standalone column-group deployment without the header
- * remote leaves `state.viewMode` undefined) the stored view mode is not a stored aspect of that page
- * and cannot be reported modified.
+ * modified by a column change and vice versa.
+ *
+ * Aspects the page does not track are skipped rather than compared: `fieldValues` is only evaluated
+ * when the header remote reports them (a standalone column-group deployment without the header remote
+ * never sets them) and the view-mode comparison is only applied when the page reports a view mode,
+ * while `displayedColumnsIds` is only evaluated when the column-group remote reports them (a header
+ * remote on its own never sets them). This keeps a single-remote deployment from reporting the
+ * selected config as permanently modified by aspects the page does not track.
  */
 export function isSearchConfigModified(config: SearchConfigInfo | undefined, pageData: SearchConfigPageData): boolean {
   if (config === undefined) return false
 
   let modified = false
-  if (hasValues(config)) {
+  if (hasValues(config) && pageData.fieldValues !== undefined) {
     modified =
-      !areValuesEqual(config.values, pageData.fieldValues ?? {}) ||
+      !areValuesEqual(config.values, pageData.fieldValues) ||
       (pageData.viewMode !== undefined && (config.isAdvanced ? advancedViewMode : basicViewMode) !== pageData.viewMode)
   }
-  if (hasColumns(config) && !areColumnsEqual(config.columns, pageData.displayedColumnsIds)) {
+  if (
+    hasColumns(config) &&
+    pageData.displayedColumnsIds !== undefined &&
+    !areColumnsEqual(config.columns, pageData.displayedColumnsIds)
+  ) {
     modified = true
   }
   return modified

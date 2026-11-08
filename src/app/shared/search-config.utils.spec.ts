@@ -47,49 +47,83 @@ describe('search-config.utils', () => {
     isAdvanced: false
   }
 
-  describe('hasValues / hasColumns / hasOnlyValues / hasOnlyColumns', () => {
-    it('should report the stored aspects of a config', () => {
+  describe('hasValues', () => {
+    it('should be true when the config stores at least one value', () => {
       expect(hasValues(valuesConfig)).toBe(true)
-      expect(hasColumns(valuesConfig)).toBe(false)
-      expect(hasOnlyValues(valuesConfig)).toBe(true)
-      expect(hasOnlyColumns(valuesConfig)).toBe(false)
-
-      expect(hasValues(columnsConfig)).toBe(false)
-      expect(hasColumns(columnsConfig)).toBe(true)
-      expect(hasOnlyValues(columnsConfig)).toBe(false)
-      expect(hasOnlyColumns(columnsConfig)).toBe(true)
-
       expect(hasValues(combinedConfig)).toBe(true)
+    })
+
+    it('should be false when the config stores no values', () => {
+      expect(hasValues(columnsConfig)).toBe(false)
+    })
+  })
+
+  describe('hasColumns', () => {
+    it('should be true when the config stores at least one column', () => {
+      expect(hasColumns(columnsConfig)).toBe(true)
       expect(hasColumns(combinedConfig)).toBe(true)
+    })
+
+    it('should be false when the config stores no columns', () => {
+      expect(hasColumns(valuesConfig)).toBe(false)
+    })
+  })
+
+  describe('hasOnlyValues', () => {
+    it('should be true when the config stores values and no columns', () => {
+      expect(hasOnlyValues(valuesConfig)).toBe(true)
+    })
+
+    it('should be false when the config stores columns or no values', () => {
+      expect(hasOnlyValues(columnsConfig)).toBe(false)
       expect(hasOnlyValues(combinedConfig)).toBe(false)
+    })
+  })
+
+  describe('hasOnlyColumns', () => {
+    it('should be true when the config stores columns and no values', () => {
+      expect(hasOnlyColumns(columnsConfig)).toBe(true)
+    })
+
+    it('should be false when the config stores values or no columns', () => {
+      expect(hasOnlyColumns(valuesConfig)).toBe(false)
       expect(hasOnlyColumns(combinedConfig)).toBe(false)
     })
   })
 
-  describe('areValuesEqual / areColumnsEqual', () => {
-    it('should compare field values by their serialized value', () => {
+  describe('areValuesEqual', () => {
+    it('should be true when the serialized field values are equal', () => {
       expect(areValuesEqual({ a: '1', b: '2' }, { a: '1', b: '2' })).toBe(true)
-      expect(areValuesEqual({ a: '1' }, { a: '2' })).toBe(false)
-      expect(areValuesEqual({ a: '1' }, {})).toBe(false)
       expect(areValuesEqual({}, {})).toBe(true)
     })
 
-    it('should compare column ids by set regardless of order', () => {
+    it('should be false when the field values differ', () => {
+      expect(areValuesEqual({ a: '1' }, { a: '2' })).toBe(false)
+      expect(areValuesEqual({ a: '1' }, {})).toBe(false)
+    })
+  })
+
+  describe('areColumnsEqual', () => {
+    it('should be true when the column ids match as a set regardless of order', () => {
       expect(areColumnsEqual(['a', 'b'], ['b', 'a'])).toBe(true)
+      expect(areColumnsEqual([], [])).toBe(true)
+    })
+
+    it('should be false when the column id sets differ', () => {
       expect(areColumnsEqual(['a', 'b'], ['a', 'c'])).toBe(false)
       expect(areColumnsEqual(['a', 'b'], ['a'])).toBe(false)
-      expect(areColumnsEqual([], [])).toBe(true)
     })
   })
 
   describe('parseFieldValues', () => {
-    it('should drop falsy values and normalize dates to ISO', () => {
-      const parsed = parseFieldValues({
-        a: '1',
-        empty: '',
-        date: new Date(Date.UTC(2024, 0, 15, 12, 0, 0))
-      })
-      expect(parsed).toEqual({ a: '1', date: '2024-01-15T12:00:00.000Z' })
+    it('should drop falsy values and keep the remaining ones as strings', () => {
+      const parsed = parseFieldValues({ a: '1', empty: '' })
+      expect(parsed).toEqual({ a: '1' })
+    })
+
+    it('should normalize date values to ISO strings', () => {
+      const parsed = parseFieldValues({ date: new Date(Date.UTC(2024, 0, 15, 12, 0, 0)) })
+      expect(parsed).toEqual({ date: '2024-01-15T12:00:00.000Z' })
     })
   })
 
@@ -107,7 +141,7 @@ describe('search-config.utils', () => {
       expect(isSearchConfigModified(valuesConfig, page)).toBe(false)
     })
 
-    it('should be modified when a values-only config field value differs', () => {
+    it('should be modified when a values-only config field value differs from the page values', () => {
       const page: SearchConfigPageData = {
         fieldValues: { key_1: 'val_1', key_2: 'val_2-changed' },
         viewMode: basicViewMode,
@@ -135,7 +169,7 @@ describe('search-config.utils', () => {
       ).toBe(true)
     })
 
-    it('should be false when a values-only config matches its field values and view mode', () => {
+    it('should not be modified when a values-only config matches its field values and view mode', () => {
       expect(
         isSearchConfigModified(valuesConfig, {
           fieldValues: { key_1: 'val_1', key_2: 'val_2' },
@@ -153,9 +187,8 @@ describe('search-config.utils', () => {
     })
 
     it('should not mark a values-only config modified by its stored view mode when the page reports no view mode', () => {
-      // Standalone column-group deployment: no header remote, so `pageData.viewMode` is undefined.
-      // The stored view mode must not be compared — otherwise the config would be reported modified
-      // by an aspect the page does not track.
+      // The page does not track the view mode (the header remote reports field values but no view
+      // mode), so the stored view mode is not a stored aspect of that page and cannot be compared.
       expect(
         isSearchConfigModified(valuesConfig, {
           fieldValues: { key_1: 'val_1', key_2: 'val_2' },
@@ -179,7 +212,22 @@ describe('search-config.utils', () => {
       ).toBe(true)
     })
 
-    it('should be modified when a columns-only config displayed columns differ', () => {
+    it('should not be modified when the page tracks no field values (standalone column-group deployment)', () => {
+      // Without the header remote the page never reports field values, so the criteria aspect is not
+      // tracked and a values-storing config must not be reported modified by it.
+      expect(
+        isSearchConfigModified(valuesConfig, {
+          displayedColumnsIds: []
+        })
+      ).toBe(false)
+      expect(
+        isSearchConfigModified(combinedConfig, {
+          displayedColumnsIds: ['col_2', 'col_1']
+        })
+      ).toBe(false)
+    })
+
+    it('should be modified when a columns-only config displayed columns differ from the page columns', () => {
       expect(
         isSearchConfigModified(columnsConfig, {
           fieldValues: { some: 'page-value' },
@@ -189,12 +237,29 @@ describe('search-config.utils', () => {
       ).toBe(true)
     })
 
-    it('should be false when a columns-only config matches its displayed columns', () => {
+    it('should not be modified when a columns-only config matches its displayed columns', () => {
       expect(
         isSearchConfigModified(columnsConfig, {
           fieldValues: { some: 'page-value' },
           viewMode: advancedViewMode,
           displayedColumnsIds: ['col_2', 'col_1']
+        })
+      ).toBe(false)
+    })
+
+    it('should not be modified when the page tracks no displayed columns (standalone header deployment)', () => {
+      // Without the column-group remote the page never reports displayed columns, so the columns
+      // aspect is not tracked and a columns-storing config must not be reported modified by it.
+      expect(
+        isSearchConfigModified(columnsConfig, {
+          fieldValues: { some: 'page-value' },
+          viewMode: basicViewMode
+        })
+      ).toBe(false)
+      expect(
+        isSearchConfigModified(combinedConfig, {
+          fieldValues: { key_1: 'val_1', key_2: 'val_2' },
+          viewMode: basicViewMode
         })
       ).toBe(false)
     })
@@ -229,7 +294,7 @@ describe('search-config.utils', () => {
       ).toBe(true)
     })
 
-    it('should be false when a combined config matches its values, view mode and columns', () => {
+    it('should not be modified when a combined config matches its values, view mode and columns', () => {
       expect(
         isSearchConfigModified(combinedConfig, {
           fieldValues: { key_1: 'val_1', key_2: 'val_2' },
@@ -239,7 +304,7 @@ describe('search-config.utils', () => {
       ).toBe(false)
     })
 
-    it('should be false when a combined config matches its values and columns even if the page reports no view mode', () => {
+    it('should not be modified when a combined config matches its values and columns and the page reports no view mode', () => {
       // A standalone column-group deployment: the page does not track view mode. The combined config
       // still has its values and columns matching, so it must not be reported modified just because
       // `pageData.viewMode` is undefined.

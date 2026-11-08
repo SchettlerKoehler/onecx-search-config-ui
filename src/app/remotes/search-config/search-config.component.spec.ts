@@ -939,32 +939,43 @@ describe('OneCXSearchConfigComponent', () => {
   })
 
   describe('on currentConfig change', () => {
-    it('should retain the selected config and emit its stored data when the field values diverge', fakeAsync(() => {
+    it('should retain the selected config and not re-emit when the field values diverge', fakeAsync(() => {
       const localFixture = TestBed.createComponent(OneCXSearchConfigComponent)
       const localComponent = localFixture.componentInstance
       localFixture.detectChanges()
       const localStore = (localComponent as any).searchConfigStore
 
+      // Seed the displayed data so the `searchConfigSelected` emission path (driven by `currentConfig$`
+      // combined with `currentDisplayedData$`) is primed for the initial selection.
       localStore.patchState({
         searchConfigs: [config],
         currentSearchConfig: config,
-        fieldValues: { k: 'v' }
+        fieldValues: config.values,
+        displayedSearchData: { fieldValues: config.values, displayedColumnsIds: [], viewMode: basicViewMode }
       })
 
       const emitterSpy = jest.spyOn(localComponent.searchConfigSelected, 'emit')
-
-      // Diverging the page's field values no longer deselects the config (#961): the selection is
-      // retained and the component re-emits the config's own stored data (not the divergent page
-      // values, and not `undefined`).
-      localComponent.currentFieldValues = { k: 'v_2' }
       tick(500)
 
+      // The initial selection emits the config's own stored data exactly once.
+      expect(emitterSpy).toHaveBeenCalledTimes(1)
       expect(emitterSpy).toHaveBeenCalledWith({
         name: config.name,
         fieldValues: config.values,
         displayedColumnsIds: [],
         viewMode: basicViewMode
       })
+      expect(localStore.state().currentSearchConfig).toBe(config)
+
+      // Diverging the page's field values no longer deselects the config (#961): the selection is
+      // retained and the mismatch surfaces as the derived `modified` flag, not a re-emission —
+      // `currentConfig$` only fires on a selection change, so a criteria divergence produces no new
+      // emission (the host keeps the config's stored data).
+      emitterSpy.mockClear()
+      localComponent.currentFieldValues = { k1: 'v_2' }
+      tick(500)
+
+      expect(emitterSpy).toHaveBeenCalledTimes(0)
       expect(localStore.state().currentSearchConfig).toBe(config)
     }))
 
@@ -1557,8 +1568,15 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     hostFixture.detectChanges()
     await hostFixture.whenStable()
 
-    // Diverge the page's criteria from the stored criteria without touching the selection.
-    childStore.patchState({ fieldValues: { k1: 'v2' }, displayedColumnsIds: ['col-1'], viewMode: basicViewMode })
+    // Diverge the page's criteria from the stored criteria without touching the selection. The header
+    // remote is active (the store under test is the search-config store), so the criteria aspect is
+    // judged.
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
     await delay(80)
     hostFixture.detectChanges()
     await hostFixture.whenStable()
@@ -1566,8 +1584,10 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // The collapsed label renders the config's name plus the `*` marker (the `#selectedItem` template),
     // not the bare name.
     const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
-    expect(combobox.textContent.trim()).toBe(`${config.name}*`)
-    expect(combobox.querySelector('.sc-search-config-modified-marker')?.textContent).toBe('*')
+    // The marker renders as a standalone span, so the name and the `*` are whitespace-separated in
+    // `textContent`; strip all whitespace before comparing the concatenated label.
+    expect(combobox.textContent.replace(/\s+/g, '')).toBe(`${config.name}*`)
+    expect(combobox.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
 
     // The opened row of the selected config carries the marker as a sibling of the name span…
     const h = await harness()
@@ -1575,13 +1595,61 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
     const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
     expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(config.name)
-    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent).toBe('*')
-    // …and the row's name tooltip is the translated "Modified" label, not the config name.
+    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+
+    // …the name span keeps the config's own name as its tooltip (with `showOnEllipsis`), while the
+    // `*` marker carries the translated "Modified" tooltip (no `showOnEllipsis`) — so the modified
+    // tooltip is guaranteed to show, not gated on the name overflowing.
     const nameDebug = hostFixture.debugElement.query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
-    expect(nameDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
+    expect(nameDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe(config.name)
+    expect(nameDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBe(true)
+    const markerDebug = hostFixture.debugElement.query(
+      By.css('.sc-search-config-row .sc-search-config-modified-marker')
+    )!
+    expect(markerDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
+    expect(markerDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBeFalsy()
 
     // The page's stored criteria diverged, but the selection was retained, not cleared.
     expect(childStore.state().currentSearchConfig).toBe(config)
+  })
+
+  it('should render the Modified tooltip on hover of the modified marker', async () => {
+    // `config` stores the criteria `{ k1: 'v1' }`; select it and diverge the field values to make it
+    // modified (the selection is retained, so the `*` marker renders).
+    await patchConfigs([config])
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+    // The header remote is active so the criteria divergence is judged and the marker renders.
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The collapsed (`#selectedItem`) marker is always visible — no need to open the overlay — so use
+    // it to prove the tooltip actually mounts on hover (the name tooltip alone only shows on
+    // ellipsis, which never happens in jsdom).
+    const marker = hostFixture.nativeElement.querySelector(
+      'p-select span[role="combobox"] .sc-search-config-modified-marker'
+    ) as HTMLElement
+    expect(marker).toBeTruthy()
+    // The tooltip container only exists once shown.
+    expect(document.body.querySelector('.p-tooltip')).toBeNull()
+
+    marker.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    hostFixture.detectChanges()
+
+    // Hovering the marker (no `showOnEllipsis`) mounts the tooltip in `document.body` (the default
+    // `appendTo`) with the translated "Modified" label.
+    const tooltipText = document.body.querySelector('.p-tooltip .p-tooltip-text')
+    expect(tooltipText).toBeTruthy()
+    expect(tooltipText!.textContent?.trim()).toBe('Modified')
   })
 
   it('should clear the modified marker and restore the name tooltip when the values are restored', async () => {
@@ -1591,7 +1659,13 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await delay(80)
     hostFixture.detectChanges()
     await hostFixture.whenStable()
-    childStore.patchState({ fieldValues: { k1: 'v2' }, displayedColumnsIds: ['col-1'], viewMode: basicViewMode })
+    // The header remote is active so the criteria divergence is judged (and the marker appears).
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
     await delay(80)
     hostFixture.detectChanges()
     await hostFixture.whenStable()

@@ -92,7 +92,8 @@ describe('SearchConfigStore', () => {
       store.patchState({
         currentSearchConfig: testConfigOnlyValues,
         fieldValues: { key_1: 'val_1', key_2: 'val_2-changed' },
-        viewMode: basicViewMode
+        viewMode: basicViewMode,
+        searchConfigComponentActive: true
       })
 
       const vm = await firstValueFrom(store.searchConfigVm$)
@@ -101,11 +102,26 @@ describe('SearchConfigStore', () => {
       expect(vm.currentConfigModified).toBe(true)
     })
 
+    it('should not mark the current config modified when the header remote is inactive and the criteria differ', async () => {
+      // Standalone column-group deployment: no header remote, so the criteria aspect is not judged.
+      store.patchState({
+        currentSearchConfig: testConfigOnlyValues,
+        fieldValues: { key_1: 'val_1', key_2: 'val_2-changed' },
+        viewMode: basicViewMode,
+        searchConfigComponentActive: false
+      })
+
+      const vm = await firstValueFrom(store.searchConfigVm$)
+
+      expect(vm.currentConfigModified).toBe(false)
+    })
+
     it('should mark the current config modified when a criteria-only config view mode differs', async () => {
       store.patchState({
         currentSearchConfig: testConfigOnlyValues,
         fieldValues: { key_1: 'val_1', key_2: 'val_2' },
-        viewMode: advancedViewMode
+        viewMode: advancedViewMode,
+        searchConfigComponentActive: true
       })
 
       const vm = await firstValueFrom(store.searchConfigVm$)
@@ -117,7 +133,8 @@ describe('SearchConfigStore', () => {
       store.patchState({
         currentSearchConfig: testConfigOnlyValues,
         fieldValues: { key_1: 'val_1', key_2: 'val_2' },
-        viewMode: basicViewMode
+        viewMode: basicViewMode,
+        searchConfigComponentActive: true
       })
 
       const vm = await firstValueFrom(store.searchConfigVm$)
@@ -130,12 +147,30 @@ describe('SearchConfigStore', () => {
         currentSearchConfig: testConfigValuesAndColumns,
         fieldValues: { key_1: 'val_1', key_2: 'val_2' },
         viewMode: basicViewMode,
-        displayedColumnsIds: ['col_1']
+        displayedColumnsIds: ['col_1'],
+        searchConfigComponentActive: true,
+        columnGroupComponentActive: true
       })
 
       const vm = await firstValueFrom(store.searchConfigVm$)
 
       expect(vm.currentConfigModified).toBe(true)
+    })
+
+    it('should not mark the current config modified when the column-group remote is inactive and the columns differ', async () => {
+      // Standalone header deployment: no column-group remote, so the columns aspect is not judged.
+      store.patchState({
+        currentSearchConfig: testConfigValuesAndColumns,
+        fieldValues: { key_1: 'val_1', key_2: 'val_2' },
+        viewMode: basicViewMode,
+        displayedColumnsIds: ['col_1'],
+        searchConfigComponentActive: true,
+        columnGroupComponentActive: false
+      })
+
+      const vm = await firstValueFrom(store.searchConfigVm$)
+
+      expect(vm.currentConfigModified).toBe(false)
     })
   })
 
@@ -339,7 +374,9 @@ describe('SearchConfigStore', () => {
     })
 
     describe('currentConfig$ selector', () => {
-      it('should update when an only-values config is selected and the new key is a search config', (done) => {
+      it('should keep the header current config when the selected saved config stores no values', (done) => {
+        // A columns-only saved config only re-scopes the displayed columns; the header criteria
+        // config is retained (the column change surfaces as a derived `modified` flag).
         store.patchState({
           selectedGroupKey: 'default',
           currentSearchConfig: testConfigOnlyValues,
@@ -351,7 +388,7 @@ describe('SearchConfigStore', () => {
         store.setSelectedGroupKey(testConfigOnlyColumns.name)
 
         store.currentConfig$.pipe(take(1)).subscribe((config) => {
-          expect(config).toStrictEqual(testConfigOnlyColumns)
+          expect(config).toBe(testConfigOnlyValues)
           done()
         })
       })
@@ -373,11 +410,11 @@ describe('SearchConfigStore', () => {
         expect(store.state().currentSearchConfig).toBe(testConfigBase)
       })
 
-      it('should keep the header current config when a different saved config is selected and the current config stores columns', () => {
-        // The header is active with a current config that stores columns. Selecting another saved
-        // config re-scopes only the displayed columns (the "Sales" criteria + a new "Wide" column
-        // group case): the current config is retained, so the column change surfaces as a derived
-        // `modified` flag rather than swapping the header config.
+      it('should adopt the selected saved config when it stores values and re-scope the columns with it', () => {
+        // Selecting a saved config that stores values (including a combined criteria + columns config)
+        // replaces the header's current config: the "Sales" criteria + "Wide" column group case where
+        // the selected config carries its own criteria. The retained-only path is for columns-only
+        // picks, which keep the header criteria config.
         store.patchState({
           selectedGroupKey: 'default',
           currentSearchConfig: testConfigValuesAndColumns,
@@ -386,15 +423,68 @@ describe('SearchConfigStore', () => {
           searchConfigComponentActive: true
         })
 
-        // `testConfigBase` is a different saved config (not the current one, not a predefined/custom
-        // key) and the current config stores columns, so the guard retains the current config instead
-        // of adopting the newly selected one.
         store.setSelectedGroupKey(testConfigBase.name)
 
-        expect(store.state().currentSearchConfig).toBe(testConfigValuesAndColumns)
+        expect(store.state().currentSearchConfig).toBe(testConfigBase)
         // The selection itself was applied.
         expect(store.state().selectedGroupKey).toBe(testConfigBase.name)
       })
+    })
+
+    // AC4 end to end: the header's current "Sales" config stores both criteria and a column group,
+    // and the page currently matches it (no `*`). Selecting the columns-only "Wide" saved config
+    // re-scopes the displayed columns to Wide's while retaining Sales as the header criteria config —
+    // so the header marks the retained Sales config modified (its stored columns no longer match) and
+    // the column-group select, pointing at Wide, does not (its stored columns match the new display).
+    it('should mark the retained header config modified but not the selected config when a columns-only config re-scopes the displayed columns', async () => {
+      const sales: SearchConfigInfo = {
+        id: 'sales_id',
+        name: 'Sales',
+        columns: ['col_s'],
+        values: { key_s: 'val_s' },
+        isReadonly: false,
+        isAdvanced: false
+      }
+      const wide: SearchConfigInfo = {
+        id: 'wide_id',
+        name: 'Wide',
+        columns: ['col_w1', 'col_w2'],
+        values: {},
+        isReadonly: false,
+        isAdvanced: false
+      }
+
+      // Page matches the current "Sales" config: its values, view mode and columns all agree.
+      store.patchState({
+        searchConfigs: [sales, wide],
+        currentSearchConfig: sales,
+        selectedGroupKey: sales.name,
+        fieldValues: sales.values,
+        viewMode: basicViewMode,
+        displayedColumnsIds: sales.columns,
+        searchConfigComponentActive: true,
+        columnGroupComponentActive: true
+      })
+
+      // Before the selection change nothing is modified.
+      let vm = await firstValueFrom(store.searchConfigVm$)
+      expect(vm.currentConfigModified).toBe(false)
+
+      // The user picks the columns-only "Wide" group: the header criteria config is retained, only
+      // the selection re-points.
+      store.setSelectedGroupKey(wide.name)
+      // The host then applies Wide's columns to the page.
+      store.updateDisplayedColumnsIds(wide.columns)
+
+      vm = await firstValueFrom(store.searchConfigVm$)
+      // Sales is retained and its stored columns no longer match the displayed columns.
+      expect(vm.currentConfig).toBe(sales)
+      expect(vm.currentConfigModified).toBe(true)
+
+      const selectionVm = await firstValueFrom(store.columnSelectionVm$)
+      // The select points at Wide, whose stored columns match the displayed columns.
+      expect(selectionVm.selectedGroupKey).toBe(wide.name)
+      expect(selectionVm.selectedConfigModified).toBe(false)
     })
 
     // (b) Two-remote (column-group active) case: a saved-config selection made by the column store is
@@ -806,7 +896,8 @@ describe('SearchConfigStore', () => {
         searchConfigs: [testConfigOnlyColumns],
         currentSearchConfig: testConfigOnlyColumns,
         selectedGroupKey: testConfigOnlyColumns.name,
-        displayedColumnsIds: ['col_1']
+        displayedColumnsIds: ['col_1'],
+        columnGroupComponentActive: true
       })
 
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
@@ -820,7 +911,24 @@ describe('SearchConfigStore', () => {
         searchConfigs: [testConfigOnlyColumns],
         currentSearchConfig: testConfigOnlyColumns,
         selectedGroupKey: testConfigOnlyColumns.name,
-        displayedColumnsIds: ['col_2', 'col_1']
+        displayedColumnsIds: ['col_2', 'col_1'],
+        columnGroupComponentActive: true
+      })
+
+      store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
+        expect(vm.selectedConfigModified).toBe(false)
+        done()
+      })
+    })
+
+    it('should not mark the selected config modified when the column-group remote is inactive and the columns differ', (done) => {
+      // Standalone header deployment: no column-group remote, so the columns aspect is not judged.
+      store.patchState({
+        searchConfigs: [testConfigOnlyColumns],
+        currentSearchConfig: testConfigOnlyColumns,
+        selectedGroupKey: testConfigOnlyColumns.name,
+        displayedColumnsIds: ['col_1'],
+        columnGroupComponentActive: false
       })
 
       store.columnSelectionVm$.pipe(take(1)).subscribe((vm) => {
@@ -845,8 +953,8 @@ describe('SearchConfigStore', () => {
         )
       ).toBe(current)
 
-      // The new key is not a saved config nor a predefined/custom group: the config is replaced by
-      // whatever saved config matches the new key (here: none), so the result is undefined.
+      // The new key is not a saved config nor a predefined/custom group: no saved config matches the
+      // new key (here: none), so the current config is retained.
       expect(
         (store as any).updateConfigBySelectedGroupKey(
           {
@@ -859,7 +967,7 @@ describe('SearchConfigStore', () => {
           },
           'custom-group'
         )
-      ).toBeUndefined()
+      ).toBe(current)
 
       // The header's current config is retained when the new key is the host custom group and the
       // previous selection was a saved config (the first-branch keep — a custom/predefined group never
@@ -896,8 +1004,9 @@ describe('SearchConfigStore', () => {
         )
       ).toBe(testConfigValuesAndColumns)
 
-      // A saved config is adopted when the current config stores no columns (the column selection is
-      // the only signal of the criteria config).
+      // A saved config that stores no values only re-scopes the displayed columns (the "Sales"
+      // criteria + "Wide" columns group case): the header criteria config is retained, the column
+      // change surfaces as a derived `modified` flag.
       expect(
         (store as any).updateConfigBySelectedGroupKey(
           {
@@ -909,7 +1018,22 @@ describe('SearchConfigStore', () => {
           },
           testConfigOnlyColumns.name
         )
-      ).toBe(testConfigOnlyColumns)
+      ).toBe(testConfigOnlyValues)
+
+      // A saved config that stores values replaces the current config (the "Wide" group also carrying
+      // its own criteria — the combined case adopts the whole saved config).
+      expect(
+        (store as any).updateConfigBySelectedGroupKey(
+          {
+            ...initialState,
+            searchConfigComponentActive: true,
+            currentSearchConfig: testConfigOnlyValues,
+            selectedGroupKey: 'default-key',
+            searchConfigs: [testConfigBase]
+          },
+          testConfigBase.name
+        )
+      ).toBe(testConfigBase)
 
       expect(
         (store as any).updateConfigBySelectedGroupKey(
@@ -924,19 +1048,6 @@ describe('SearchConfigStore', () => {
           'other-config'
         )
       ).toEqual({ ...testConfigOnlyValues, name: 'other-config' })
-
-      expect(
-        (store as any).updateConfigBySelectedGroupKey(
-          {
-            ...initialState,
-            searchConfigComponentActive: true,
-            currentSearchConfig: current,
-            selectedGroupKey: testConfigOnlyColumns.name,
-            searchConfigs: [testConfigOnlyColumns]
-          },
-          testConfigOnlyColumns.name
-        )
-      ).toBe(testConfigOnlyColumns)
 
       expect(
         (store as any).updateConfigBySelectedGroupKey(

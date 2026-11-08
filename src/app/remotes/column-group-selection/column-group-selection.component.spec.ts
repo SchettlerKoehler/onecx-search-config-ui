@@ -1920,11 +1920,14 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     // The select points at the saved config (`selectedGroupKey`) and the header's current config is the
     // same one; the marker is driven by the selection, so the displayed columns must diverge from the
     // stored columns to mark the selected config modified.
+    // The column-group remote is active so the displayed-columns aspect is judged (and the marker
+    // appears).
     childStore.patchState({
       selectedGroupKey: onlyColumnsConfig.name,
       currentSearchConfig: onlyColumnsConfig,
       displayedColumnsIds: ['col-9'],
-      viewMode: basicViewMode
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
     })
     await settle()
 
@@ -1934,10 +1937,18 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
 
     const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
     expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(onlyColumnsConfig.name)
-    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent).toBe('*')
+    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    // The name span keeps the config's own name as its tooltip; the `*` marker carries the
+    // translated "Modified" tooltip.
     expect(
       hostFixture.debugElement
         .query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe(onlyColumnsConfig.name)
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-row .sc-search-config-modified-marker'))!
         .injector.get(Tooltip)
         .getOption('tooltipLabel')
     ).toBe('Modified')
@@ -1949,9 +1960,9 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
   it('should mark the selected saved config (not the header current config) modified when the selection differs from the current config', async () => {
     // The "Sales" / "Wide" example: the header's current config (`sales`) stores values AND columns,
     // and the column-group select points at a different saved config (`wide`). Changing the displayed
-    // columns diverges from BOTH stored column sets — so the header marks the retained current config
-    // (Sales*) while the column-group select marks the selection it shows (Wide*), and the two marked
-    // rows are distinct. This is what the `item.config === currentConfig` binding used to break.
+    // columns diverges from BOTH stored column sets — so the column-group select marks the selection
+    // it shows (Wide*), while the row for the header's retained current config (Sales) shows no `*`,
+    // because that marker is driven by the selection, not by the header's current config.
     const sales = {
       id: 'sales',
       name: 'Sales',
@@ -1970,12 +1981,14 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     } as SearchConfigInfo
 
     await patchConfigs([sales, wide])
+    // The column-group remote is active so the displayed-columns aspect is judged.
     childStore.patchState({
       selectedGroupKey: wide.name,
       currentSearchConfig: sales,
       displayedColumnsIds: ['col-9'],
       fieldValues: { a: '1' },
-      viewMode: basicViewMode
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
     })
     await settle()
 
@@ -2001,8 +2014,15 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     const wideNameSpan = nameSpans.find((span) => (span.nativeElement as HTMLElement).textContent?.trim() === wide.name)
     expect(wideRow).toBeTruthy()
     expect(wideNameSpan).toBeTruthy()
-    expect(wideRow.querySelector('.sc-search-config-modified-marker')?.textContent).toBe('*')
-    expect(wideNameSpan!.injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
+    expect(wideRow.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    // The name span keeps the config's own name as its tooltip; the `*` marker carries the
+    // translated "Modified" tooltip. Only Wide is marked, so there is exactly one marker.
+    expect(wideNameSpan!.injector.get(Tooltip).getOption('tooltipLabel')).toBe(wide.name)
+    const wideMarker = hostFixture.debugElement.queryAll(
+      By.css('.sc-search-config-row .sc-search-config-modified-marker')
+    )
+    expect(wideMarker.length).toBe(1)
+    expect(wideMarker[0].injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
 
     // The retained header config (Sales) is NOT marked in the column-group select — it is a different
     // config from the one selected, so its row shows its name and no `*`.
@@ -2022,11 +2042,14 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     // displayed columns is what clears the flag — not some residual values mismatch. The select points
     // at the saved config (`selectedGroupKey`), which is the config the marker refers to.
     await patchConfigs([onlyColumnsConfig])
+    // The column-group remote is active so the displayed-columns divergence is judged (and the marker
+    // appears).
     childStore.patchState({
       selectedGroupKey: onlyColumnsConfig.name,
       currentSearchConfig: onlyColumnsConfig,
       displayedColumnsIds: ['col-9'],
-      viewMode: basicViewMode
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
     })
     await settle()
 

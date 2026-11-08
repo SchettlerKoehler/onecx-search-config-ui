@@ -263,11 +263,11 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    // The current config is retained even when its stored values no longer match the page — the
-    // mismatch surfaces as a derived `modified` flag (see `searchConfigVm$`), not a deselection.
-    // A page values change never re-points the column-group selection at the retained config: the
+    // A page state change never re-points the column-group selection at the retained config: the
     // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
-    // (re-syncing it would snap the select back to the config's own column group).
+    // (re-syncing it would snap the select back to the config's own column group). The current config
+    // is retained even when its stored aspects no longer match the page — the mismatch surfaces as a
+    // derived `modified` flag (see `isSearchConfigModified`), not a deselection.
     const stateToUpdate: Partial<SearchConfigState> = {
       fieldValues: parsedValues,
       displayedSearchData: {
@@ -285,11 +285,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    // The current config is retained even when its stored columns no longer match the page — the
-    // mismatch surfaces as a derived `modified` flag (see `columnSelectionVm$`), not a deselection.
-    // A page columns change never re-points the column-group selection at the retained config: the
-    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
-    // (re-syncing it would snap the select back to the config's own column group).
     const stateToUpdate: Partial<SearchConfigState> = {
       displayedColumnsIds: displayedColumnsIds,
       displayedSearchData: {
@@ -307,11 +302,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    // The current config is retained even when its stored view mode no longer matches the page —
-    // the mismatch surfaces as a derived `modified` flag (see `searchConfigVm$`), not a deselection.
-    // A page view-mode change never re-points the column-group selection at the retained config: the
-    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
-    // (re-syncing it would snap the select back to the config's own column group).
     const stateToUpdate: Partial<SearchConfigState> = {
       viewMode: viewMode,
       displayedSearchData: {
@@ -369,10 +359,13 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     (state, currentConfig): SearchConfigViewModel => ({
       searchConfigs: state.searchConfigs.filter((config) => hasValues(config)),
       currentConfig: currentConfig,
+      // Each page aspect is only judged while its owning remote reports it: the criteria while the
+      // header remote is active, the columns while the column-group remote is active — so a
+      // single-remote deployment is not reported modified by aspects it does not track.
       currentConfigModified: isSearchConfigModified(currentConfig, {
-        fieldValues: state.fieldValues,
-        viewMode: state.viewMode,
-        displayedColumnsIds: state.displayedColumnsIds
+        fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
+        viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
+        displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
       }),
       isColumnGroupComponentActive: state.columnGroupComponentActive,
       layout: state.layout
@@ -388,10 +381,13 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   // reflected without any store round-trip.
   readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
     const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
+    // Each page aspect is only judged while its owning remote reports it: the criteria while the
+    // header remote is active, the columns while the column-group remote is active — so a
+    // single-remote deployment is not reported modified by aspects it does not track.
     const pageData = {
-      fieldValues: state.fieldValues,
-      viewMode: state.viewMode,
-      displayedColumnsIds: state.displayedColumnsIds
+      fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
+      viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
+      displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
     }
     // The config the select points at (`selectedGroupKey`), not the header's current config: when the
     // two differ the column-group select marks the selection it shows, the header marks the retained
@@ -564,9 +560,10 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
    *
    * The header's current config is retained whenever the new key is a host predefined/custom column
    * group (those never change the header criteria config — they only affect the column-group
-   * selection), and also when the new key selects a saved config that only re-scopes the displayed
-   * columns of a header config that already stores columns. Only adopting a saved config whose
-   * criteria differ replaces the current config.
+   * selection) or selects a saved config that stores no values (columns-only picks keep the header
+   * criteria config, surfacing as a derived `modified` flag). Adopting a saved config that stores
+   * values replaces the current config — including the "Sales" criteria + "Wide" case where the
+   * selected columns config also stores its own criteria.
    */
   private updateConfigBySelectedGroupKey(
     state: SearchConfigState,
@@ -588,14 +585,8 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
         .concat(state.customGroupKey ? [state.customGroupKey] : [])
         .includes(selectedGroupKey)
     ) {
-      // A header config that stores columns keeps its criteria when the column group selection changes
-      // to another saved/predefined layout (the "Sales" criteria + a new "Wide" column group example):
-      // the column change is surfaced as a derived `modified` flag, not a config swap. Only when the
-      // current config stores no columns does selecting a saved config adopt it (the criteria change).
-      if (state.currentSearchConfig && hasColumns(state.currentSearchConfig)) {
-        return state.currentSearchConfig
-      }
-      return state.searchConfigs.find((c) => c.name === selectedGroupKey)
+      const picked = state.searchConfigs.find((c) => c.name === selectedGroupKey)
+      return picked && hasValues(picked) ? picked : state.currentSearchConfig
     }
 
     return state.currentSearchConfig
