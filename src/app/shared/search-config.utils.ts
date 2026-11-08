@@ -1,7 +1,15 @@
 import { isValidDate } from '@onecx/accelerator'
 
 import { SearchConfigInfo } from './generated'
+import { advancedViewMode, basicViewMode, advancedViewModeType, basicViewModeType } from './constants'
 import { FieldValues, UnparsedFieldValues } from './search-config.store'
+
+/** The page aspects compared to decide whether a config is modified (field values, view mode, columns). */
+export type SearchConfigPageData = {
+  fieldValues?: FieldValues
+  viewMode?: basicViewModeType | advancedViewModeType
+  displayedColumnsIds: Array<string>
+}
 
 export function hasValues(config: SearchConfigInfo): boolean {
   return Object.keys(config.values).length > 0
@@ -21,6 +29,28 @@ export function hasOnlyColumns(config: SearchConfigInfo): boolean {
 
 export function areValuesEqual(v1: FieldValues, v2: FieldValues): boolean {
   return JSON.stringify(v1) === JSON.stringify(v2)
+}
+
+/**
+ * Whether a saved config is modified relative to the page's current state. A config is modified when
+ * any aspect it stores differs, by value comparison, from the page's current state: the criteria
+ * (field values plus view mode) when it stores values, and the displayed columns when it stores
+ * columns. Aspects the config does not store are ignored, so a config with only values is never
+ * modified by a column change and vice versa.
+ */
+export function isSearchConfigModified(config: SearchConfigInfo | undefined, pageData: SearchConfigPageData): boolean {
+  if (config === undefined) return false
+
+  let modified = false
+  if (hasValues(config)) {
+    modified =
+      !areValuesEqual(config.values, pageData.fieldValues ?? {}) ||
+      (config.isAdvanced ? advancedViewMode : basicViewMode) !== pageData.viewMode
+  }
+  if (hasColumns(config) && !areColumnsEqual(config.columns, pageData.displayedColumnsIds)) {
+    modified = true
+  }
+  return modified
 }
 
 export function parseFieldValues(values: UnparsedFieldValues): FieldValues {

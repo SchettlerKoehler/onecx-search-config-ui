@@ -29,9 +29,19 @@
           </ng-template>
           <ng-template #item let-item>
             <div class="sc-search-config-row">
-              <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
-                item.label
-              }}</span>
+              <span
+                class="sc-search-config-row-name"
+                [pTooltip]="
+                  item.config && item.config === vm.currentConfig && vm.currentConfigModified
+                    ? ('SEARCH_CONFIG.SELECT.MODIFIED' | translate)
+                    : item.label
+                "
+                [showOnEllipsis]="true"
+                >{{ item.label }}</span
+              >
+              @if (item.config && item.config === vm.currentConfig && vm.currentConfigModified) {
+                <span class="sc-search-config-modified-marker">*</span>
+              }
               @if (canDelete(item.config)) {
                 <p-button
                   class="sc-search-config-delete"
@@ -44,6 +54,20 @@
                 ></p-button>
               }
             </div>
+          </ng-template>
+          <ng-template #selectedItem let-item>
+            <span
+              [pTooltip]="
+                item.config && item.config === vm.currentConfig && vm.currentConfigModified
+                  ? ('SEARCH_CONFIG.SELECT.MODIFIED' | translate)
+                  : undefined
+              "
+              [showOnEllipsis]="true"
+              >{{ item.label }}</span
+            >
+            @if (item.config && item.config === vm.currentConfig && vm.currentConfigModified) {
+              <span class="sc-search-config-modified-marker">*</span>
+            }
           </ng-template>
         </p-select>
         <label class="sc-search-config-label" id="sc_column_group_label" for="sc_column_group_select">

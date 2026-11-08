@@ -1910,6 +1910,73 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(tooltip.el.nativeElement).toBe(nameSpan)
   })
 
+  it('should show the modified marker and a Modified tooltip on the selected saved config row when its displayed columns differ', async () => {
+    // `onlyColumnsConfig` stores only columns (`values: {}`), so the columns aspect is isolated: the
+    // page's field values stay equal to the stored (empty) values and only the displayed columns
+    // diverge. That divergence is what marks the config modified, while the selection is retained. The
+    // header is inactive (default) so the column selection change never swaps the header's current
+    // config.
+    await patchConfigs([onlyColumnsConfig])
+    childStore.patchState({
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode
+    })
+    await settle()
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
+    expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(onlyColumnsConfig.name)
+    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent).toBe('*')
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe('Modified')
+
+    // The selection was retained, not cleared.
+    expect(childStore.state().currentSearchConfig).toBe(onlyColumnsConfig)
+  })
+
+  it('should clear the modified marker and restore the name tooltip when the displayed columns are restored', async () => {
+    // Isolate the columns aspect with `onlyColumnsConfig` (`values: {}`), so restoring the stored
+    // displayed columns is what clears the flag — not some residual values mismatch.
+    await patchConfigs([onlyColumnsConfig])
+    childStore.patchState({
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode
+    })
+    await settle()
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    expect(
+      hostFixture.nativeElement.querySelector('.sc-search-config-row .sc-search-config-modified-marker')
+    ).toBeTruthy()
+
+    // Restoring the stored displayed columns clears the flag: the marker is gone and the name tooltip
+    // is the config name again.
+    childStore.patchState({ displayedColumnsIds: onlyColumnsConfig.columns })
+    await settle()
+    await hostFixture.whenStable()
+
+    expect(
+      hostFixture.nativeElement.querySelector('.sc-search-config-row .sc-search-config-modified-marker')
+    ).toBeNull()
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe(onlyColumnsConfig.name)
+  })
+
   it('should delete the focused saved-config option when Delete is pressed on the open select combobox', async () => {
     ;(portalDialogHostMock.openDialog as jest.Mock).mockReturnValue(of(undefined as any))
 

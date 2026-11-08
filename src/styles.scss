@@ -29,7 +29,7 @@
   --onecx-search-config-delete-color: var(--p-button-danger-background);
   /* Light-red hover background behind the trash icon (PrimeNG text-danger hover tint). */
   --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
-  /* Color of the "modified" marker on a config row (used by a later ticket). */
+  /* Color of the "modified" marker next to a selected config's name (option-list row and collapsed label). */
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
   /* Color of a config option-group header in the list (used by the column remote's grouped headers). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
@@ -67,6 +67,15 @@ ocx-column-group-selection-component {
 
   .sc-search-config-select {
     height: var(--onecx-search-config-height);
+  }
+
+  /* "Modified" marker next to the selected config's name: same text as the name (it inherits the
+   * select's font), tinted by the app-owned modified-marker token. It sits in the option-list row
+   * (a flex row, so it must not shrink) and in the collapsed select label (not a flex row, where the
+   * flex shorthand is inert). Kept at the host level so it reaches both. */
+  .sc-search-config-modified-marker {
+    color: var(--onecx-search-config-modified-marker-color);
+    flex: 0 0 auto;
   }
 
   /* Config-select option list: single-line rows (ellipsis + tooltip). */
