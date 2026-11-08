@@ -33,9 +33,9 @@
                 config.name
               }}</span>
               @if (config.id === vm.currentConfig?.id && vm.currentConfigModified) {
-                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
-                  *
-                </span>
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                  >*</span
+                >
               }
               @if (canDelete(config)) {
                 <p-button
@@ -53,9 +53,9 @@
           <ng-template #selectedItem let-config>
             <span [pTooltip]="config.name" [showOnEllipsis]="true">{{ config.name }}</span>
             @if (vm.currentConfigModified) {
-              <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
-                *
-              </span>
+              <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                >*</span
+              >
             }
           </ng-template>
         </p-select>

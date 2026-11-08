@@ -1583,9 +1583,10 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // The collapsed label renders the config's name plus the `*` marker (the `#selectedItem` template),
     // not the bare name.
     const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
-    // The marker renders as a standalone span, so the name and the `*` are whitespace-separated in
-    // `textContent`; strip all whitespace before comparing the concatenated label.
-    expect(combobox.textContent.replace(/\s+/g, '')).toBe(`${config.name}*`)
+    // The marker span holds the `*` with no inner whitespace, and Angular strips the newline
+    // between the name and the marker, so the concatenated label is the name immediately
+    // followed by the `*` (any outer whitespace is trimmed off).
+    expect(combobox.textContent.trim()).toBe(`${config.name}*`)
     expect(combobox.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
 
     // The opened row of the selected config carries the marker as a sibling of the name span…
@@ -1612,7 +1613,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(childStore.state().currentSearchConfig).toBe(config)
   })
 
-  it('should render the Modified tooltip on hover of the modified marker', async () => {
+  it('should render the Modified tooltip when the modified marker is hovered', async () => {
     // `config` stores the criteria `{ k1: 'v1' }`; select it and diverge the field values to make it
     // modified (the selection is retained, so the `*` marker renders).
     await patchConfigs([config])

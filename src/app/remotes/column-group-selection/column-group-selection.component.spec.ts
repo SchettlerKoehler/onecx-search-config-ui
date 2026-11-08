@@ -1957,12 +1957,11 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(childStore.state().currentSearchConfig).toBe(onlyColumnsConfig)
   })
 
-  it('should mark the selected saved config (not the header current config) modified when the selection differs from the current config', async () => {
-    // The "Sales" / "Wide" example: the header's current config (`sales`) stores values AND columns,
-    // and the column-group select points at a different saved config (`wide`). Changing the displayed
-    // columns diverges from BOTH stored column sets — so the column-group select marks the selection
-    // it shows (Wide*), while the row for the header's retained current config (Sales) shows no `*`,
-    // because that marker is driven by the selection, not by the header's current config.
+  it('should mark only the selected saved config row modified when the displayed columns match neither the selected nor the header config', async () => {
+    // The select points at `wide` while the header retains `sales` as its current config, and the
+    // displayed columns match neither the selected config's stored columns nor the header's. The row
+    // marker is driven by the selection — not by which configs are modified — so only the selected
+    // row (the config the select points at) is marked; the header's retained config row shows no `*`.
     const sales = {
       id: 'sales',
       name: 'Sales',

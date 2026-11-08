@@ -33,9 +33,9 @@
                 item.label
               }}</span>
               @if (item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
-                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
-                  *
-                </span>
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                  >*</span
+                >
               }
               @if (canDelete(item.config)) {
                 <p-button
@@ -53,9 +53,9 @@
           <ng-template #selectedItem let-item>
             <span [pTooltip]="item.label" [showOnEllipsis]="true">{{ item.label }}</span>
             @if (vm.selectedConfigModified) {
-              <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
-                *
-              </span>
+              <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                >*</span
+              >
             }
           </ng-template>
         </p-select>

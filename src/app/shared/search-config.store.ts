@@ -18,7 +18,8 @@ import {
   hasOnlyValues,
   hasValues,
   isSearchConfigModified,
-  parseFieldValues
+  parseFieldValues,
+  SearchConfigPageData
 } from './search-config.utils'
 
 export const SEARCH_CONFIG_TOPIC = new InjectionToken<SearchConfigTopic>('searchConfigTopic')
@@ -359,14 +360,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     (state, currentConfig): SearchConfigViewModel => ({
       searchConfigs: state.searchConfigs.filter((config) => hasValues(config)),
       currentConfig: currentConfig,
-      // Each page aspect is only judged while its owning remote reports it: the criteria while the
-      // header remote is active, the columns while the column-group remote is active — so a
-      // single-remote deployment is not reported modified by aspects it does not track.
-      currentConfigModified: isSearchConfigModified(currentConfig, {
-        fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
-        viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
-        displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
-      }),
+      currentConfigModified: isSearchConfigModified(currentConfig, this.pageDataFor(state)),
       isColumnGroupComponentActive: state.columnGroupComponentActive,
       layout: state.layout
     })
@@ -381,14 +375,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   // reflected without any store round-trip.
   readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
     const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
-    // Each page aspect is only judged while its owning remote reports it: the criteria while the
-    // header remote is active, the columns while the column-group remote is active — so a
-    // single-remote deployment is not reported modified by aspects it does not track.
-    const pageData = {
-      fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
-      viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
-      displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
-    }
+    const pageData = this.pageDataFor(state)
     // The config the select points at (`selectedGroupKey`), not the header's current config: when the
     // two differ the column-group select marks the selection it shows, the header marks the retained
     // current config. Predefined/custom keys resolve to no config and are therefore never modified.
@@ -506,6 +493,17 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
   // *********** Utilities *********** //
 
+  // Each page aspect is only judged while its owning remote reports it: the criteria while the
+  // header remote is active, the columns while the column-group remote is active — so a
+  // single-remote deployment is not reported modified by aspects it does not track.
+  private pageDataFor(state: SearchConfigState): SearchConfigPageData {
+    return {
+      fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
+      viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
+      displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
+    }
+  }
+
   sendUpdateMessage(stateToUpdate: Partial<SearchConfigState>, state: SearchConfigState) {
     let wholeState = false
     if (this.storeName === searchConfigStoreName && !state.columnGroupComponentActive) {
@@ -562,34 +560,22 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
    * group (those never change the header criteria config — they only affect the column-group
    * selection) or selects a saved config that stores no values (columns-only picks keep the header
    * criteria config, surfacing as a derived `modified` flag). Adopting a saved config that stores
-   * values replaces the current config — including the "Sales" criteria + "Wide" case where the
-   * selected columns config also stores its own criteria.
+   * values replaces the current config.
    */
   private updateConfigBySelectedGroupKey(
     state: SearchConfigState,
     selectedGroupKey: string
   ): SearchConfigInfo | undefined {
-    if (!state.searchConfigComponentActive) return state.currentSearchConfig
-
-    const searchConfigForSelectedKey = state.searchConfigs.some((c) => c.name === state.selectedGroupKey)
-
     if (
-      searchConfigForSelectedKey &&
-      (state.nonSearchConfigGroupKeys.includes(selectedGroupKey) || selectedGroupKey === state.customGroupKey)
+      !state.searchConfigComponentActive ||
+      state.nonSearchConfigGroupKeys.includes(selectedGroupKey) ||
+      selectedGroupKey === state.customGroupKey
     ) {
       return state.currentSearchConfig
     }
 
-    if (
-      !state.nonSearchConfigGroupKeys
-        .concat(state.customGroupKey ? [state.customGroupKey] : [])
-        .includes(selectedGroupKey)
-    ) {
-      const picked = state.searchConfigs.find((c) => c.name === selectedGroupKey)
-      return picked && hasValues(picked) ? picked : state.currentSearchConfig
-    }
-
-    return state.currentSearchConfig
+    const picked = state.searchConfigs.find((c) => c.name === selectedGroupKey)
+    return picked && hasValues(picked) ? picked : state.currentSearchConfig
   }
 
   private isNotUndefined<T>(val: T | undefined): val is T {

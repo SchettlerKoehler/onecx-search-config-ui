@@ -429,6 +429,22 @@ describe('SearchConfigStore', () => {
         // The selection itself was applied.
         expect(store.state().selectedGroupKey).toBe(testConfigBase.name)
       })
+
+      it('should keep the current config when switching from a saved config to a predefined group', () => {
+        // The current selection is a saved config; moving to a host predefined group never changes the
+        // header's criteria config, so `currentSearchConfig` is retained.
+        store.patchState({
+          selectedGroupKey: testConfigValuesAndColumns.name,
+          currentSearchConfig: testConfigValuesAndColumns,
+          nonSearchConfigGroupKeys: ['default'],
+          searchConfigs: [testConfigValuesAndColumns],
+          searchConfigComponentActive: true
+        })
+
+        store.setSelectedGroupKey('default')
+
+        expect(store.state().currentSearchConfig).toBe(testConfigValuesAndColumns)
+      })
     })
 
     // AC4 end to end: the header's current "Sales" config stores both criteria and a column group,
