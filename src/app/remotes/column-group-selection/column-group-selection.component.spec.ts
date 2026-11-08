@@ -531,6 +531,38 @@ describe('OneCXColumnGroupSelectionComponent', () => {
     })
   })
 
+  describe('hasOptions', () => {
+    it('should report options when a host predefined column group exists and no saved config does', () => {
+      const vmValue = {
+        nonSearchConfigGroupKeys: ['default'],
+        searchConfigsWithColumns: [],
+        customGroupKey: 'custom'
+      } as any
+
+      expect(component.hasOptions(vmValue)).toBe(true)
+    })
+
+    it('should report options when a saved column config exists and no predefined column group does', () => {
+      const vmValue = {
+        nonSearchConfigGroupKeys: [],
+        searchConfigsWithColumns: [onlyColumnsConfig],
+        customGroupKey: 'custom'
+      } as any
+
+      expect(component.hasOptions(vmValue)).toBe(true)
+    })
+
+    it('should report no options when there are no predefined column groups and no saved column configs', () => {
+      const vmValue = {
+        nonSearchConfigGroupKeys: [],
+        searchConfigsWithColumns: [],
+        customGroupKey: 'custom'
+      } as any
+
+      expect(component.hasOptions(vmValue)).toBe(false)
+    })
+  })
+
   describe('select label and placeholder', () => {
     it('should show the host placeholder key while nothing is selected', () => {
       component.placeholderKey = 'COLUMN_GROUP_SELECTION.SELECT.PLACEHOLDER'
@@ -1240,6 +1272,25 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     await (saveAs as NonNullable<typeof saveAs>).click()
 
     expect(saveSpy).toHaveBeenCalled()
+  })
+
+  it('should render a disabled select when there are no predefined column groups and no saved configs', async () => {
+    // No saved configs and no predefined groups (no `columns` carry `predefinedGroupKeys`), so the
+    // grouped select has no option in either the Predefined or the Saved group and is disabled — the
+    // same disabled empty state the search header select uses with no configs — instead of opening to
+    // two empty group headers.
+    await patchConfigs([])
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox).toBeTruthy()
+    expect(combobox.getAttribute('aria-disabled')).toBe('true')
+    expect(combobox.hasAttribute('disabled')).toBe(true)
+
+    // Save As stays enabled.
+    const saveAsButton = hostFixture.nativeElement.querySelector(
+      `#${SEARCH_CONFIG_SAVE_AS_BUTTON_ID} button`
+    ) as HTMLButtonElement
+    expect(saveAsButton.disabled).toBe(false)
   })
 
   it('should expose the keyboard delete hint to the combobox when a deletable config is present', async () => {

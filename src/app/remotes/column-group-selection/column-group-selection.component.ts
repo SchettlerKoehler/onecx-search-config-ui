@@ -262,6 +262,14 @@ export class OneCXColumnGroupSelectionComponent
     ]
   }
 
+  // Whether the grouped config select has any selectable option: a host predefined column group or
+  // a saved config that stores columns. When neither group has an item the select is disabled (the
+  // same disabled empty state the search header select uses with no configs) rather than opening to
+  // two empty group headers.
+  hasOptions(vm: ColumnSelectionViewModel): boolean {
+    return vm.nonSearchConfigGroupKeys.length > 0 || vm.searchConfigsWithColumns.length > 0
+  }
+
   // The select's label shows the host-provided placeholder while nothing is selected and the fixed
   // "Column group" label once a group or config has been picked.
   selectLabel(vm: ColumnSelectionViewModel): string {

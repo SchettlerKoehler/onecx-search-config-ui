@@ -12,6 +12,7 @@
           (ngModelChange)="onColumnGroupChange($event)"
           [options]="getOptions(vm)"
           [group]="true"
+          [disabled]="!hasOptions(vm)"
           optionLabel="label"
           optionValue="value"
           [filter]="true"
