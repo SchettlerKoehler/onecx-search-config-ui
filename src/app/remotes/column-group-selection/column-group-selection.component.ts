@@ -235,13 +235,20 @@ export class OneCXColumnGroupSelectionComponent
   }
 
   // Grouped options for the config select: the host-provided predefined column groups (never
-  // deletable) plus the saved configs that store columns.
+  // deletable) plus the saved configs that store columns. Predefined items carry `isPredefined` so the
+  // template and the keyboard delete path can tell them apart from saved items even when a predefined
+  // key equals a saved config's name (a name-only lookup would then resolve the predefined row to the
+  // saved config).
   getOptions(vm: ColumnSelectionViewModel) {
     return [
       {
         label: this.translateService.instant('COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED'),
         value: 'predefined',
-        items: vm.nonSearchConfigGroupKeys.map((key) => ({ label: key, value: key }))
+        items: vm.nonSearchConfigGroupKeys.map((key) => ({
+          label: this.translateService.instant(key),
+          value: key,
+          isPredefined: true
+        }))
       },
       {
         label: this.translateService.instant('COLUMN_GROUP_SELECTION.GROUPS.SAVED'),
@@ -304,8 +311,14 @@ export class OneCXColumnGroupSelectionComponent
     if (focusedIndex < 0) {
       return
     }
-    const option = select.visibleOptions()[focusedIndex] as { value: string } | undefined
-    const config = this.searchConfigStore.state().searchConfigs.find((c) => c.name === option?.value)
+    const state = this.searchConfigStore.state()
+    const option = select.visibleOptions()[focusedIndex] as { value: string; isPredefined?: boolean } | undefined
+    // Predefined (host column group) leaves are never deletable, even when their key equals a saved
+    // config's name and the config would resolve by name.
+    if (option?.isPredefined) {
+      return
+    }
+    const config = state.searchConfigs.find((c) => c.name === option?.value)
     if (config && this.canDelete(config)) {
       event.preventDefault()
       this.onColumnGroupDelete(config)
@@ -330,7 +343,8 @@ export class OneCXColumnGroupSelectionComponent
   }
 
   // Save As saves a NEW config that stores the currently displayed columns (never the input values):
-  // the create dialog is opened with `saveColumns` pre-selected and the column option frozen.
+  // the create dialog is opened with `saveColumns` pre-selected. The column option is not frozen — the
+  // full save-options rework (freeze semantics) lands in #962.
   onColumnGroupSaveAs(vm: ColumnSelectionViewModel) {
     this.portalDialogService
       .openDialog<CreateOrEditSearchDialogContent>(

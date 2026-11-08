@@ -501,8 +501,8 @@ describe('OneCXColumnGroupSelectionComponent', () => {
           label: 'Predefined',
           value: 'predefined',
           items: [
-            { label: 'default', value: 'default' },
-            { label: 'full', value: 'full' }
+            { label: 'default', value: 'default', isPredefined: true },
+            { label: 'full', value: 'full', isPredefined: true }
           ]
         },
         {
