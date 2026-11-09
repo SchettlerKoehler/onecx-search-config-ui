@@ -1,4 +1,6 @@
+import { Component } from '@angular/core'
 import { ComponentFixture, TestBed } from '@angular/core/testing'
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
 import { By } from '@angular/platform-browser'
 import { FormControl } from '@angular/forms'
 import { TranslateService } from '@ngx-translate/core'
@@ -11,6 +13,7 @@ import { provideTranslateTestingService } from '@onecx/angular-testing'
 import { SearchConfigInfo } from 'src/app/shared/generated'
 
 import { CreateOrEditSearchConfigDialogComponent } from './create-or-edit-search-config-dialog.component'
+import { CreateOrEditSearchConfigDialogHarness } from './create-or-edit-search-config-dialog.component.harness'
 
 const configFixture = (id: string, name: string, readonly = false): SearchConfigInfo => ({
   id,
@@ -22,6 +25,15 @@ const configFixture = (id: string, name: string, readonly = false): SearchConfig
   isReadonly: readonly,
   isAdvanced: false
 })
+
+// Embeds the reworked dialog so the component harness can resolve the dialog's host element the way
+// a portaled dialog would (a bare `TestBed.createComponent` host is a `<div id="root0">`, not the
+// `app-ocx-…` element the harness `hostSelector` targets).
+@Component({
+  imports: [CreateOrEditSearchConfigDialogComponent],
+  template: '<app-ocx-create-or-edit-search-config-dialog></app-ocx-create-or-edit-search-config-dialog>'
+})
+class SaveAsDialogHostComponent {}
 
 describe('CreateOrEditSearchConfigDialogComponent', () => {
   const alpha = configFixture('alpha', 'Alpha')
@@ -412,6 +424,33 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
       expect(autocomplete.panelStyleClass).toBe('sc-search-config-save-as-panel')
       // The form control drives the name field so the field is wired for editing (not prefilled).
       expect(field(component, 'searchConfigName').value).toBe('')
+    })
+  })
+
+  describe('component harness (name field through the reworked p-autocomplete)', () => {
+    // The name field is a `p-autocomplete` (driven by the `searchConfigName` form control), so the
+    // harness drives it through the autocomplete's input rather than a plain input; this pins the
+    // `getSearchConfigInputHarness` helper against the reworked dialog.
+    it('should resolve the name field via the harness and reflect a typed name in the form control', async () => {
+      const hostFixture = TestBed.createComponent(SaveAsDialogHostComponent)
+      const component = hostFixture.debugElement.children[0]
+        .componentInstance as CreateOrEditSearchConfigDialogComponent
+      component.existingConfigs = configs
+      hostFixture.detectChanges()
+
+      const harness = await TestbedHarnessEnvironment.documentRootLoader(hostFixture).getHarness(
+        CreateOrEditSearchConfigDialogHarness
+      )
+      const nameInput = await harness.getSearchConfigInputHarness()
+
+      expect(await nameInput.getValue()).toBe('')
+      await nameInput.setValue('Alpha')
+      hostFixture.detectChanges()
+
+      // The typeahead autocomplete lands the keystroke in the form control, so the typed name is what
+      // the overwrite-match and dialog-result logic read.
+      expect(field(component, 'searchConfigName').value).toBe('Alpha')
+      expect(component.matchedConfigId).toBe('alpha')
     })
   })
 })
