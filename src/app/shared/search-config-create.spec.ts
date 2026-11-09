@@ -312,6 +312,36 @@ describe('search-config-create', () => {
       })
     })
 
+    it('should store and toast the trimmed name for a new name with surrounding whitespace', async () => {
+      openDialog.mockReturnValue(
+        of({
+          button: 'primary',
+          result: { searchConfigName: '  New Name  ', saveInputValues: true, saveColumns: true }
+        } as any)
+      )
+      create.mockReturnValue(of({ id: 'new-id', configs: [createdConfig] }))
+
+      await lastValueFrom(
+        saveSearchConfig(portalDialogService, searchConfigService, messageService, appStateService, store, pageName, {
+          ...baseDialogInputs,
+          existingConfigs: []
+        })
+      )
+
+      // The stored (and toasted) name is trimmed, so a whitespace-padded name never stores its padding.
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'New Name',
+          columns: ['col-1'],
+          values: { f1: 'v1' }
+        })
+      )
+      expect(success).toHaveBeenCalledWith({
+        summaryKey: 'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVED',
+        summaryParameters: { config: 'New Name' }
+      })
+    })
+
     it('should save only the criteria when "Save columns" is unchecked for a new name', async () => {
       store = {
         ...store,

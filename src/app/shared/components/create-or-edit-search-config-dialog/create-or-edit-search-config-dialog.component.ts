@@ -25,11 +25,6 @@ export type CreateOrEditSearchDialogContent = {
   searchConfigName: string
   saveInputValues: boolean
   saveColumns: boolean
-  /**
-   * Id of the existing, non-read-only config whose name the field resolves to (trimmed, case-insensitive),
-   * or `undefined` when the typed name is new and a config is created instead.
-   */
-  matchedConfigId?: string
 }
 @Component({
   selector: 'app-ocx-create-or-edit-search-config-dialog',
@@ -160,12 +155,12 @@ export class CreateOrEditSearchConfigDialogComponent
     if (this.frozeColumnSaveOption) {
       return this.translateService.instant('SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_KEEP_COLUMNS', { name })
     }
-    const key =
-      saveInputValues && saveColumns
-        ? 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_BOTH'
-        : saveColumns
-          ? 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_COLUMNS'
-          : 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_CRITERIA'
+    let key = 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_CRITERIA'
+    if (saveInputValues && saveColumns) {
+      key = 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_BOTH'
+    } else if (saveColumns) {
+      key = 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERWRITE_COLUMNS'
+    }
     return this.translateService.instant(key, { name })
   }
 
@@ -200,8 +195,7 @@ export class CreateOrEditSearchConfigDialogComponent
     this.dialogResult = {
       searchConfigName: this.searchConfigFormGroup?.get('searchConfigName')?.value,
       saveInputValues: this.searchConfigFormGroup?.get('saveInputValues')?.value,
-      saveColumns: this.searchConfigFormGroup?.get('saveColumns')?.value,
-      matchedConfigId: this.matchedConfigId
+      saveColumns: this.searchConfigFormGroup?.get('saveColumns')?.value
     }
     return true
   }
@@ -211,10 +205,12 @@ export class CreateOrEditSearchConfigDialogComponent
   }
 
   private primaryButtonEnabledFor(values: CreateOrEditSearchDialogContent): boolean {
-    // A non-empty name plus at least one checked box. While "Save columns" is locked it is forced off,
-    // so only the criteria box can contribute in that case. The `!!` normalises the disabled
-    // `saveColumns` control (absent from `formGroup.value` when disabled) to a strict boolean.
-    return !!values.searchConfigName && !!(values.saveInputValues || values.saveColumns)
+    // A non-empty name (trimmed, so a whitespace-only name can never enable the button) plus at least
+    // one checked box. While "Save columns" is locked it is forced off, so only the criteria box can
+    // contribute in that case. The `!!` normalises the disabled `saveColumns` control (absent from
+    // `formGroup.value` when disabled) to a strict boolean.
+    const name = (values.searchConfigName ?? '').trim()
+    return name.length > 0 && !!(values.saveInputValues || values.saveColumns)
   }
 
   private matchName(name: string | undefined): string | undefined {

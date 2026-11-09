@@ -146,14 +146,20 @@ export function saveSearchConfig(
           (config) => !config.isReadonly && config.name.trim().toLowerCase() === typedName
         )
         const isOverwrite = existingConfig !== undefined
+        // The trimmed name: the field is required to be non-blank (the dialog's Save gate trims the
+        // name), so what is stored and toasted is never a whitespace-only name.
+        const name = (result.searchConfigName ?? '').trim()
         // The columns the request carries: the displayed ones when the box is checked, otherwise the
         // stored columns of the matched config only while "Save columns" is locked (kept, not dropped),
         // and none otherwise.
-        const columns = result.saveColumns
-          ? pageData.displayedColumnsIds
-          : isOverwrite && dialogInputs.frozeColumnSaveOption
-            ? existingConfig.columns
-            : []
+        let columns: string[]
+        if (result.saveColumns) {
+          columns = pageData.displayedColumnsIds
+        } else if (isOverwrite && dialogInputs.frozeColumnSaveOption) {
+          columns = existingConfig.columns
+        } else {
+          columns = []
+        }
         const values = result.saveInputValues ? parseFieldValues(pageData.fieldValues ?? {}) : {}
         const isAdvanced = result.saveInputValues ? pageData.viewMode === advancedViewMode : false
 
@@ -191,7 +197,7 @@ export function saveSearchConfig(
           fieldListVersion: 0,
           isReadonly: false,
           page,
-          name: result.searchConfigName ?? '',
+          name,
           isAdvanced,
           columns,
           values
@@ -200,7 +206,7 @@ export function saveSearchConfig(
           map((response) => {
             portalMessageService.success({
               summaryKey: 'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVED',
-              summaryParameters: { config: result.searchConfigName ?? '' }
+              summaryParameters: { config: name }
             })
             return { id: response.id, configs: response.configs, overwritten: false } as SaveSearchConfigResult
           }),

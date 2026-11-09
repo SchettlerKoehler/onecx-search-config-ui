@@ -274,6 +274,20 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
       expect(emissions[emissions.length - 1]).toBe(true)
     })
 
+    it('should stay disabled for a whitespace-only name even with a box checked (the name must be non-blank)', () => {
+      const { component } = render({ existingConfigs: configs, saveInputValues: true })
+      const emissions: boolean[] = []
+      component.primaryButtonEnabled.subscribe((value) => emissions.push(value))
+
+      // The name is only whitespace: the trimmed name is blank, so the button stays disabled.
+      field(component, 'searchConfigName').setValue('   ')
+      expect(emissions[emissions.length - 1]).toBe(false)
+
+      // A non-blank name (the surrounding whitespace is trimmed) enables it.
+      field(component, 'searchConfigName').setValue('  Alpha  ')
+      expect(emissions[emissions.length - 1]).toBe(true)
+    })
+
     it('should stay disabled while "Save columns" is locked and only the criteria box can enable it', () => {
       const { component } = render({ existingConfigs: configs, frozeColumnSaveOption: true })
       const emissions: boolean[] = []
@@ -379,7 +393,7 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
       result: undefined
     }
 
-    it('should capture the name, the boxes and the matched config id into the result', () => {
+    it('should capture the name and the boxes into the result', () => {
       const { component } = render({ existingConfigs: configs })
 
       field(component, 'searchConfigName').setValue('Alpha')
@@ -390,12 +404,11 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
       expect(component.dialogResult).toEqual({
         searchConfigName: 'Alpha',
         saveInputValues: true,
-        saveColumns: false,
-        matchedConfigId: 'alpha'
+        saveColumns: false
       })
     })
 
-    it('should carry no matched config id for a new name', () => {
+    it('should capture a new name into the result', () => {
       const { component } = render({ existingConfigs: configs })
 
       field(component, 'searchConfigName').setValue('Brand New')
@@ -405,8 +418,7 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
       expect(component.dialogResult).toEqual({
         searchConfigName: 'Brand New',
         saveInputValues: false,
-        saveColumns: false,
-        matchedConfigId: undefined
+        saveColumns: false
       })
     })
   })
