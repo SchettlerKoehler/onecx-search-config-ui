@@ -43,9 +43,10 @@ import {
   ColumnSelectionViewModel,
   SearchConfigStore
 } from 'src/app/shared/search-config.store'
-import { COLUMN_GROUP_SAVE_AS_BUTTON_ID } from 'src/app/shared/constants'
+import { COLUMN_GROUP_SAVE_AS_BUTTON_ID, SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS } from 'src/app/shared/constants'
 import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
-import { createSearchConfig, loadSearchConfigInfos } from 'src/app/shared/search-config-create'
+import { loadSearchConfigInfos, saveSearchConfig } from 'src/app/shared/search-config-create'
+import { hasColumns } from 'src/app/shared/search-config.utils'
 
 @Component({
   selector: 'app-ocx-column-group-selection',
@@ -331,12 +332,14 @@ export class OneCXColumnGroupSelectionComponent
   }
 
   // Save As saves a NEW config that stores the currently displayed columns (never the input values):
-  // the create dialog is opened with `saveColumns` pre-selected. The column option is not frozen — the
-  // full save-options rework (freeze semantics) lands in #962. The dialog, request and toasts live in
-  // the shared `createSearchConfig` helper (so both remotes open the same dialog); on success we just
-  // add the created config to the store and select it.
+  // the Save As dialog is opened with `saveColumns` pre-selected. The column option is not frozen here
+  // (this entry point owns the column selector, so it is editable). The dialog, request and toasts live
+  // in the shared `saveSearchConfig` helper (so both remotes open the same dialog); on success we upsert
+  // the saved config into the store and select it (upsert, not add, so an overwrite replaces the stored
+  // content in place). The header's current config is also re-pointed only when the saved config stores
+  // columns, so a columns-only save surfaces in the header select.
   onColumnGroupSaveAs() {
-    createSearchConfig(
+    saveSearchConfig(
       this.portalDialogService,
       this.searchConfigService,
       this.portalMessageService,
@@ -344,22 +347,24 @@ export class OneCXColumnGroupSelectionComponent
       this.searchConfigStore,
       this.pageName$,
       {
-        searchConfigName: '',
+        existingConfigs: this.searchConfigStore.state().searchConfigs,
+        appendTo: 'self',
+        panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
         saveInputValues: false,
         saveColumns: true,
         frozeColumnSaveOption: false
       }
     ).subscribe((response) => {
       if (response?.id) {
-        this.portalMessageService.info({
-          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
-        })
         const config = response.configs.find((config) => config.id === response.id)
         setTimeout(() => {
-          config && this.searchConfigStore.addSearchConfig(config)
+          config && this.searchConfigStore.upsertSearchConfig(config)
         })
         setTimeout(() => {
           config && this.searchConfigStore.setSelectedGroupKey(config.name)
+        })
+        setTimeout(() => {
+          config && hasColumns(config) && this.searchConfigStore.setCurrentConfig(config)
         })
       }
     })

@@ -22,17 +22,23 @@
     "DELETE": {
       "DELETE_KEY_HINT": "Press Delete to remove"
     },
-    "CREATE_EDIT_TOOLTIP": "Please enter the name of the search configuration",
-    "SEARCH_CRITERION_NAME": "Search criterion name",
-    "SAVE_COLUMNS_OPTION": "Do you want to save the shown columns?",
-    "SAVE_INPUT_FIELDS_OPTION": "Do you want to save the input values from the input fields?",
     "COLUMN_GROUP_COMPONENT_INACTIVE": "*Column group component is inactive. Enable it to save, load and edit search configs with columns",
     "TABLE_VIEW_INACTIVE": "*Table view is inactive. Enable it to save, load and edit search configs with columns",
-    "CREATE_EDIT_DIALOG": {
-      "CREATE_HEADER": "Create search config",
-      "CONFIRM": "Confirm",
+    "SAVE_AS_DIALOG": {
+      "HEADER": "Save search config",
+      "NAME": "Search config name",
+      "SAVE": "Save",
       "CANCEL": "Cancel",
-      "CREATE_SUCCESS": "Successfully added search config",
+      "SAVE_CRITERIA": "Save search criteria",
+      "SAVE_COLUMNS": "Save columns",
+      "OVERWRITE_CRITERIA": "'{{name}}' already exists. Saving overwrites it with its search criteria only.",
+      "OVERWRITE_COLUMNS": "'{{name}}' already exists. Saving overwrites it with its saved columns only.",
+      "OVERWRITE_BOTH": "'{{name}}' already exists. Saving overwrites its search criteria and its saved columns.",
+      "OVERWRITE_KEEP_COLUMNS": "'{{name}}' already exists. Saving overwrites its search criteria; its saved columns are kept.",
+      "SAVED": "Search config '{{config}}' saved.",
+      "OVERRIDDEN": "Search config '{{config}}' overwritten."
+    },
+    "CREATE_EDIT_DIALOG": {
       "CREATE_FAILURE": "Failed to add search config"
     },
     "LOAD_FAILURE": "Failed to load search configs",

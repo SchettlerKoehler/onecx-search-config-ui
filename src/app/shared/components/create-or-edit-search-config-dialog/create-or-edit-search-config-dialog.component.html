@@ -1,29 +1,34 @@
-<form [formGroup]="searchConfigFormGroup" [class]="'searchConfigDialog'">
-  <div class="mt-2">
-    <p-floatlabel variant="on">
-      <input
-        id="searchConfigName"
-        type="text"
-        pInputText
-        formControlName="searchConfigName"
-        [pTooltip]="'SEARCH_CONFIG.CREATE_EDIT_TOOLTIP' | translate"
-        tooltipPosition="top"
-      />
-      <label for="searchConfigName">{{ 'SEARCH_CONFIG.SEARCH_CRITERION_NAME' | translate }}</label>
-    </p-floatlabel>
+<form [formGroup]="searchConfigFormGroup" class="searchConfigDialog">
+  <p-floatlabel variant="on">
+    <p-autocomplete
+      inputId="searchConfigName"
+      [typeahead]="true"
+      [completeOnFocus]="true"
+      [minQueryLength]="0"
+      [suggestions]="nameSuggestions"
+      [appendTo]="appendTo"
+      [panelStyleClass]="panelStyleClass"
+      formControlName="searchConfigName"
+      (completeMethod)="onNameQuery($event)"
+    ></p-autocomplete>
+    <label for="searchConfigName">{{ 'SEARCH_CONFIG.SAVE_AS_DIALOG.NAME' | translate }}</label>
+  </p-floatlabel>
+
+  @if (overwritePending) {
+    <p-message severity="warn" role="alert" aria-live="polite" class="sc-search-config-overwrite-warning">
+      {{ overwriteWarning }}
+    </p-message>
+  }
+
+  <div class="sc-search-config-option">
+    <p-checkbox inputId="saveInputValuesId" formControlName="saveInputValues" [binary]="true"></p-checkbox>
+    <label for="saveInputValuesId">{{ 'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVE_CRITERIA' | translate }}</label>
   </div>
 
-  <div class="flex">
-    <p-checkbox formControlName="saveInputValues" [binary]="true" inputId="saveInputValuesId"> </p-checkbox>
-    <label for="saveInputValuesId">{{ 'SEARCH_CONFIG.SAVE_INPUT_FIELDS_OPTION' | translate }}</label>
-  </div>
-
-  <div class="flex">
-    <p-checkbox [binary]="true" formControlName="saveColumns" inputId="saveColumnsId"></p-checkbox>
+  <div class="sc-search-config-option">
+    <p-checkbox inputId="saveColumnsId" formControlName="saveColumns" [binary]="true"></p-checkbox>
     <label for="saveColumnsId">
-      <ng-container>
-        {{ 'SEARCH_CONFIG.SAVE_COLUMNS_OPTION' | translate }}
-      </ng-container>
+      {{ 'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVE_COLUMNS' | translate }}
       @if (frozeColumnSaveOption) {
         {{ frozeColumnSaveOptionExplanation | translate }}
       }

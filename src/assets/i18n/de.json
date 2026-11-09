@@ -22,17 +22,23 @@
     "DELETE": {
       "DELETE_KEY_HINT": "Drücken Sie Löschen zum Entfernen"
     },
-    "CREATE_EDIT_TOOLTIP": "Bitte den Namen der Suchkonfiguration eingeben",
-    "SEARCH_CRITERION_NAME": "Suchkriterium-Name",
-    "SAVE_COLUMNS_OPTION": "Möchten Sie die angezeigten Spalten speichern?",
-    "SAVE_INPUT_FIELDS_OPTION": "Möchten Sie die Eingabewerte aus den Eingabefeldern speichern?",
     "COLUMN_GROUP_COMPONENT_INACTIVE": "*Die Komponente Spaltengruppe ist inaktiv. Aktivieren Sie sie, um Suchkonfigurationen mit Spalten zu speichern, zu laden und zu bearbeiten",
     "TABLE_VIEW_INACTIVE": "*Die Tabellenansicht ist inaktiv. Aktivieren Sie sie, um Suchkonfigurationen mit Spalten zu speichern, zu laden und zu bearbeiten",
-    "CREATE_EDIT_DIALOG": {
-      "CREATE_HEADER": "Suchkonfiguration erstellen",
-      "CONFIRM": "Bestätigen",
+    "SAVE_AS_DIALOG": {
+      "HEADER": "Suchkonfiguration speichern",
+      "NAME": "Name der Suchkonfiguration",
+      "SAVE": "Speichern",
       "CANCEL": "Abbrechen",
-      "CREATE_SUCCESS": "Suchkonfiguration erfolgreich hinzugefügt",
+      "SAVE_CRITERIA": "Suchkriterien speichern",
+      "SAVE_COLUMNS": "Spalten speichern",
+      "OVERWRITE_CRITERIA": "'{{name}}' existiert bereits. Speichern ersetzt es nur um seine Suchkriterien.",
+      "OVERWRITE_COLUMNS": "'{{name}}' existiert bereits. Speichern ersetzt es nur um seine gespeicherten Spalten.",
+      "OVERWRITE_BOTH": "'{{name}}' existiert bereits. Speichern ersetzt seine Suchkriterien und seine gespeicherten Spalten.",
+      "OVERWRITE_KEEP_COLUMNS": "'{{name}}' existiert bereits. Speichern ersetzt seine Suchkriterien; seine gespeicherten Spalten bleiben erhalten.",
+      "SAVED": "Suchkonfiguration '{{config}}' gespeichert.",
+      "OVERRIDDEN": "Suchkonfiguration '{{config}}' überschrieben."
+    },
+    "CREATE_EDIT_DIALOG": {
       "CREATE_FAILURE": "Fehler beim Erstellen der Suchkonfiguration"
     },
     "LOAD_FAILURE": "Fehler beim Laden der Suchkonfigurationen",

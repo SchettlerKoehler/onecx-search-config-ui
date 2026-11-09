@@ -28,11 +28,12 @@ import {
   advancedViewModeType,
   basicViewMode,
   basicViewModeType,
+  SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
   SEARCH_CONFIG_SAVE_AS_BUTTON_ID
 } from 'src/app/shared/constants'
 import { hasColumns, hasValues } from 'src/app/shared/search-config.utils'
 import { confirmAndDeleteSearchConfig } from 'src/app/shared/search-config-delete'
-import { createSearchConfig, loadSearchConfigInfos } from 'src/app/shared/search-config-create'
+import { loadSearchConfigInfos, saveSearchConfig } from 'src/app/shared/search-config-create'
 import { environment } from 'src/environments/environment'
 
 @Component({
@@ -169,7 +170,7 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
   }
 
   onSearchConfigSave(vm: SearchConfigViewModel) {
-    // The selection is not cleared up front so a cancelled or failed create leaves the current
+    // The selection is not cleared up front so a cancelled or failed save leaves the current
     // selection intact in the select.
 
     let frozeColumnSaveOptionExplanation = ''
@@ -180,9 +181,12 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       frozeColumnSaveOptionExplanation = 'SEARCH_CONFIG.TABLE_VIEW_INACTIVE'
     }
 
-    // The dialog, request and toasts live in the shared `createSearchConfig` helper (so both remotes
-    // open the same dialog); on success we just add the created config to the store and select it.
-    createSearchConfig(
+    // The dialog, request and toasts live in the shared `saveSearchConfig` helper (so both remotes
+    // open the same Save As dialog); on success we upsert the saved config into the store and select
+    // it (upsert, not add, so an overwrite replaces the stored content in place). The header's
+    // pre-check seeds "Save search criteria" (`saveInputValues: true`); the columns option is frozen
+    // while the column selector is absent or the layout is not a table.
+    saveSearchConfig(
       this.portalDialogService,
       this.searchConfigService,
       this.portalMessageService,
@@ -190,20 +194,19 @@ export class OneCXSearchConfigComponent implements ocxRemoteComponent, ocxRemote
       this.searchConfigStore,
       this.searchConfigStore.pageName$,
       {
-        searchConfigName: '',
-        saveInputValues: false,
+        existingConfigs: this.searchConfigStore.state().searchConfigs,
+        appendTo: 'self',
+        panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
+        saveInputValues: true,
         saveColumns: false,
         frozeColumnSaveOption: !(vm.isColumnGroupComponentActive && vm.layout === 'table'),
         frozeColumnSaveOptionExplanation
       }
     ).subscribe((response) => {
       if (response?.id) {
-        this.portalMessageService.info({
-          summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_SUCCESS'
-        })
         const config = response.configs.find((config) => config.id === response.id)
         setTimeout(() => {
-          config && this.searchConfigStore.addSearchConfig(config)
+          config && this.searchConfigStore.upsertSearchConfig(config)
         })
         setTimeout(() => {
           config && this.searchConfigStore.setCurrentConfig(config)

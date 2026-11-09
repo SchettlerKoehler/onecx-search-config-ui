@@ -1,18 +1,16 @@
+/*
+ * Layout only — no ::ng-deep, no hard-coded sizes. The form is a column of stacked blocks whose gap
+ * uses PrimeNG's dialog content-gap token (the reusable delete-confirm dialog is the reference for a
+ * portaled search-config dialog), so the spacing follows the host theme rather than a fixed unit.
+ */
 .searchConfigDialog {
   display: flex;
   flex-direction: column;
-  gap: 1em;
-  margin-bottom: 1em;
+  gap: var(--p-confirmdialog-content-gap);
 }
 
-:host ::ng-deep .p-inputtext {
-  width: 100%;
-}
-
-:host ::ng-deep .p-checkbox {
-  margin-right: 1em;
-}
-
-:host ::ng-deep .p-checkbox-box {
-  display: none;
+.sc-search-config-option {
+  display: flex;
+  align-items: center;
+  gap: var(--p-button-gap);
 }

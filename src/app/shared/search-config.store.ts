@@ -210,6 +210,22 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     return { ...state, ...stateToUpdate }
   })
 
+  // Save As lands here: a new name adds a config, an existing (overwritten) name replaces the stored
+  // content in place (by id). The response configs always carry the saved config, so a full replace
+  // (dropping the aspects that were not checked this time) is reflected in the list for every input.
+  readonly upsertSearchConfig = this.updater((state, searchConfig: SearchConfigInfo) => {
+    const exists = state.searchConfigs.some((config) => config.id === searchConfig.id)
+    const searchConfigs = exists
+      ? state.searchConfigs.map((config) => (config.id === searchConfig.id ? searchConfig : config))
+      : state.searchConfigs.concat(searchConfig)
+
+    const stateToUpdate: Partial<SearchConfigState> = {
+      searchConfigs
+    }
+    this.sendUpdateMessage(stateToUpdate, state)
+    return { ...state, ...stateToUpdate }
+  })
+
   readonly deleteSearchConfig = this.updater((state, searchConfig: SearchConfigInfo) => {
     const isCurrentSearchConfigDeleted = state.currentSearchConfig?.id === searchConfig.id
     // Standalone (column-group) use: the select shows `selectedGroupKey` directly. When it points at the

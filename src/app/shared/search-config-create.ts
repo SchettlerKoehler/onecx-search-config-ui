@@ -6,16 +6,16 @@ import { RemoteComponentConfig } from '@onecx/angular-utils'
 
 import {
   CreateSearchConfigRequest,
-  CreateSearchConfigResponse,
   SearchConfigAPIService,
-  SearchConfigInfo
+  SearchConfigInfo,
+  UpdateSearchConfigRequest
 } from 'src/app/shared/generated'
 import { SearchConfigStore } from 'src/app/shared/search-config.store'
 import {
   CreateOrEditSearchConfigDialogComponent,
   CreateOrEditSearchDialogContent
 } from 'src/app/shared/components/create-or-edit-search-config-dialog/create-or-edit-search-config-dialog.component'
-import { advancedViewMode } from 'src/app/shared/constants'
+import { advancedViewMode, SEARCH_CONFIG_DIALOG_WIDTH } from 'src/app/shared/constants'
 import { parseFieldValues } from 'src/app/shared/search-config.utils'
 
 /**
@@ -70,10 +70,26 @@ export function loadSearchConfigInfos(
   )
 }
 
+/** The save outcome the remotes consume: the saved config's id, the response configs, and whether an
+ * existing config was overwritten (a new name is a create). */
+export type SaveSearchConfigResult = {
+  id: string
+  configs: SearchConfigInfo[]
+  overwritten: boolean
+}
+
 /**
- * Opens the reusable create dialog and, when it confirms (`button === 'primary'` with a result), builds
- * and sends the create request. A failed create fires an error toast and resolves to `undefined`; the
- * caller fires the success toast and updates the store once it resolves with a created `id`.
+ * Opens the reusable Save As dialog and, when it confirms (`button === 'primary'` with a result),
+ * creates the config for a new name or overwrites the matched existing (non-read-only) config. The
+ * matched config is resolved here against `dialogInputs.existingConfigs` (trimmed, case-insensitive),
+ * so the helper and the dialog's inline warning agree on the overwrite target without the dialog having
+ * to carry the id through its result. A failed create or update fires the shared error toast and
+ * resolves to `undefined`; the success toast (`saved` / `overwritten`, `success` severity) is fired
+ * here per path.
+ *
+ * Overwrite semantics: the saved aspects fully replace the stored content. The single exception is when
+ * "Save columns" is locked (`frozeColumnSaveOption`): the stored columns are kept (the box is forced
+ * off, so they can never be re-checked) and only the search criteria are replaced.
  *
  * `pageName` is the resolved page-name observable (the store's `pageName$` for the header, or the
  * column-group remote's live `pageName ?? applicationPath` selector for standalone use) and is applied
@@ -82,7 +98,7 @@ export function loadSearchConfigInfos(
  * drives the single emission, and the live selector always has a value, so a page name is present in the
  * standalone case too.
  */
-export function createSearchConfig(
+export function saveSearchConfig(
   portalDialogService: PortalDialogService,
   searchConfigService: SearchConfigAPIService,
   portalMessageService: PortalMessageService,
@@ -90,56 +106,123 @@ export function createSearchConfig(
   store: SearchConfigStore,
   pageName: Observable<string>,
   dialogInputs: {
-    searchConfigName: string
+    existingConfigs: SearchConfigInfo[]
+    appendTo?: 'body' | 'self' | HTMLElement | null
+    panelStyleClass?: string
     saveInputValues: boolean
     saveColumns: boolean
     frozeColumnSaveOption: boolean
     frozeColumnSaveOptionExplanation?: string
   }
-): Observable<CreateSearchConfigResponse | undefined> {
+): Observable<SaveSearchConfigResult | undefined> {
   return portalDialogService
     .openDialog<CreateOrEditSearchDialogContent>(
-      'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_HEADER',
+      'SEARCH_CONFIG.SAVE_AS_DIALOG.HEADER',
       {
         type: CreateOrEditSearchConfigDialogComponent,
         inputs: {
-          searchConfigName: dialogInputs.searchConfigName,
+          existingConfigs: dialogInputs.existingConfigs,
+          appendTo: dialogInputs.appendTo,
+          panelStyleClass: dialogInputs.panelStyleClass,
           saveInputValues: dialogInputs.saveInputValues,
           saveColumns: dialogInputs.saveColumns,
           frozeColumnSaveOption: dialogInputs.frozeColumnSaveOption,
           frozeColumnSaveOptionExplanation: dialogInputs.frozeColumnSaveOptionExplanation
         }
       },
-      'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CONFIRM',
-      'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CANCEL'
+      'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVE',
+      'SEARCH_CONFIG.SAVE_AS_DIALOG.CANCEL',
+      { width: SEARCH_CONFIG_DIALOG_WIDTH }
     )
     .pipe(
       withLatestFrom(appStateService.currentMfe$.asObservable(), store.currentPageData$, pageName),
       switchMap(([dialogResult, currentMfe, pageData, page]) => {
         const result = dialogResult?.result
         if (!result || dialogResult.button !== 'primary') {
-          return of(undefined as CreateSearchConfigResponse | undefined)
+          return of(undefined as SaveSearchConfigResult | undefined)
         }
-        const request: CreateSearchConfigRequest = {
+        const typedName = (result.searchConfigName ?? '').trim().toLowerCase()
+        const existingConfig = dialogInputs.existingConfigs.find(
+          (config) => !config.isReadonly && config.name.trim().toLowerCase() === typedName
+        )
+        const isOverwrite = existingConfig !== undefined
+        // The columns the request carries: the displayed ones when the box is checked, otherwise the
+        // stored columns of the matched config only while "Save columns" is locked (kept, not dropped),
+        // and none otherwise.
+        const columns = result.saveColumns
+          ? pageData.displayedColumnsIds
+          : isOverwrite && dialogInputs.frozeColumnSaveOption
+            ? existingConfig.columns
+            : []
+        const values = result.saveInputValues ? parseFieldValues(pageData.fieldValues ?? {}) : {}
+        const isAdvanced = result.saveInputValues ? pageData.viewMode === advancedViewMode : false
+
+        if (isOverwrite) {
+          const updateRequest: UpdateSearchConfigRequest = {
+            searchConfig: {
+              appId: currentMfe.appId,
+              productName: currentMfe.productName,
+              page,
+              modificationCount: 0,
+              fieldListVersion: 0,
+              id: existingConfig.id,
+              name: existingConfig.name,
+              columns,
+              values,
+              isReadonly: existingConfig.isReadonly,
+              isAdvanced
+            }
+          }
+          return searchConfigService.updateSearchConfig(existingConfig.id, updateRequest).pipe(
+            map((response) => {
+              portalMessageService.success({
+                summaryKey: 'SEARCH_CONFIG.SAVE_AS_DIALOG.OVERRIDDEN',
+                summaryParameters: { config: existingConfig.name }
+              })
+              return { id: existingConfig.id, configs: response.configs, overwritten: true } as SaveSearchConfigResult
+            }),
+            catchError(saveSearchConfigFailure(portalMessageService))
+          )
+        }
+
+        const createRequest: CreateSearchConfigRequest = {
           appId: currentMfe.appId,
           productName: currentMfe.productName,
           fieldListVersion: 0,
           isReadonly: false,
           page,
           name: result.searchConfigName ?? '',
-          isAdvanced: result.saveInputValues ? pageData.viewMode === advancedViewMode : false,
-          columns: result.saveColumns ? pageData.displayedColumnsIds : [],
-          values: result.saveInputValues ? parseFieldValues(pageData.fieldValues ?? {}) : {}
+          isAdvanced,
+          columns,
+          values
         }
-        return searchConfigService.createSearchConfig(request).pipe(
-          catchError((error) => {
-            console.error(error)
-            portalMessageService.error({
-              summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_FAILURE'
+        return searchConfigService.createSearchConfig(createRequest).pipe(
+          map((response) => {
+            portalMessageService.success({
+              summaryKey: 'SEARCH_CONFIG.SAVE_AS_DIALOG.SAVED',
+              summaryParameters: { config: result.searchConfigName ?? '' }
             })
-            return of(undefined as CreateSearchConfigResponse | undefined)
-          })
+            return { id: response.id, configs: response.configs, overwritten: false } as SaveSearchConfigResult
+          }),
+          catchError(saveSearchConfigFailure(portalMessageService))
         )
       })
     )
+}
+
+/**
+ * The shared failure path for the create and update requests: log the error, fire the create/edit
+ * error toast (a failed Save As is still a failed create-or-update of the config) and resolve to
+ * `undefined`.
+ */
+function saveSearchConfigFailure(
+  portalMessageService: PortalMessageService
+): (error: unknown) => Observable<undefined> {
+  return (error: unknown) => {
+    console.error(error)
+    portalMessageService.error({
+      summaryKey: 'SEARCH_CONFIG.CREATE_EDIT_DIALOG.CREATE_FAILURE'
+    })
+    return of(undefined)
+  }
 }

@@ -255,6 +255,55 @@ describe('SearchConfigStore', () => {
     })
   })
 
+  describe('upsert search config', () => {
+    it('should append a config with a new id', () => {
+      store.patchState({
+        searchConfigs: [testConfigOnlyValues]
+      })
+
+      store.upsertSearchConfig(testConfigValuesAndColumns)
+
+      expect(store.state().searchConfigs).toStrictEqual([testConfigOnlyValues, testConfigValuesAndColumns])
+    })
+
+    it('should replace the stored content of a config with an existing id', () => {
+      store.patchState({
+        searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns]
+      })
+
+      // A full overwrite: the response config carries the same id with reduced content (columns dropped).
+      const overwrittenConfig: SearchConfigInfo = {
+        ...testConfigValuesAndColumns,
+        columns: [],
+        values: { key_1: 'val_1-updated' }
+      }
+
+      store.upsertSearchConfig(overwrittenConfig)
+
+      expect(store.state().searchConfigs).toStrictEqual([testConfigOnlyValues, overwrittenConfig])
+      expect(store.state().searchConfigs.map((item) => item.id)).toStrictEqual([
+        testConfigOnlyValues.id,
+        testConfigValuesAndColumns.id
+      ])
+    })
+
+    it('should send an update message when a config is upserted', (done) => {
+      store.patchState({
+        searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns]
+      })
+
+      store.upsertSearchConfig(testConfigOnlyColumns)
+
+      mockSearchConfigStoreTopic.subscribe((msg) => {
+        expect(msg.payload.storeName).toBe('store-1')
+        expect(msg.payload.stateToUpdate).toStrictEqual({
+          searchConfigs: [testConfigOnlyValues, testConfigValuesAndColumns, testConfigOnlyColumns]
+        })
+        done()
+      })
+    })
+  })
+
   describe('delete search config', () => {
     it('should update the searchConfigVm$ selector when a search config is deleted', (done) => {
       store.patchState({
