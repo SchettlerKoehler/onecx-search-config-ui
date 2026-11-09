@@ -380,10 +380,12 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     // two differ the column-group select marks the selection it shows, the header marks the retained
     // current config. The lookup is by name, so a predefined (or custom) key whose name collides with
     // a saved config's name resolves to the saved config — a pre-existing ambiguity, because the name
-    // alone cannot tell the two apart here. When that happens the collapsed label can mark the saved
-    // config as modified even though the selection is the predefined group; the option row avoids the
-    // case with its `isPredefined` guard. Predefined/custom keys that match no saved config resolve to
-    // no config and are therefore never modified.
+    // alone cannot tell the two apart here. That leaves the marker unresolved rather than wrong: both
+    // the option row and the collapsed label guard it with `isPredefined`, so the predefined leaf is
+    // never marked. In the collapsed label PrimeNG resolves the selected option with `findIndex` over
+    // the visible options, so the first matching leaf (the predefined one) wins, and a saved config
+    // whose name equals a predefined key is never marked there. Predefined/custom keys that match no
+    // saved config resolve to no config and are therefore never modified.
     const selectedConfig = searchConfigsWithColumns.find((config) => config.name === state.selectedGroupKey)
     return {
       searchConfigsWithColumns: searchConfigsWithColumns,

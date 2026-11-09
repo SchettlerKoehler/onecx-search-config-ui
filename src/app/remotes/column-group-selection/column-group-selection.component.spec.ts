@@ -105,6 +105,15 @@ const readonlyConfig = {
   isAdvanced: false
 }
 
+// The collapsed label text a screen reader does not see: the element's text with the
+// `p-hidden-accessible` children (the marker's translated "Modified" node) removed, so the
+// visible label can be asserted without the hidden marker text.
+const visibleTextOf = (element: Element) => {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.p-hidden-accessible').forEach((hidden) => hidden.remove())
+  return clone.textContent?.trim() ?? ''
+}
+
 describe('OneCXColumnGroupSelectionComponent', () => {
   let component: OneCXColumnGroupSelectionComponent
   let fixture: ComponentFixture<OneCXColumnGroupSelectionComponent>
@@ -1937,7 +1946,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
 
     const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
     expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(onlyColumnsConfig.name)
-    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
     // The name span keeps the config's own name as its tooltip; the `*` marker carries the
     // translated "Modified" tooltip.
     expect(
@@ -1972,10 +1981,10 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     await settle()
 
     const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
-    expect(combobox.textContent.trim()).toBe(`${onlyColumnsConfig.name}*`)
+    expect(visibleTextOf(combobox)).toBe(`${onlyColumnsConfig.name}*`)
     const marker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
-    expect(marker.textContent.trim()).toBe('*')
-    expect(marker.getAttribute('aria-label')).toBe('Modified')
+    expect(marker.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+    expect(marker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
 
     // The opened panel row carries the marker too (the `#item` template), with the accessible name.
     // (Scoped to the panel — the collapsed label reuses `.sc-search-config-row` too.)
@@ -1983,9 +1992,9 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     await (await h.getConfigSelect())?.open()
     await hostFixture.whenStable()
     const row = hostFixture.nativeElement.querySelector('.sc-search-config-panel .sc-search-config-row') as HTMLElement
-    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
     const rowMarker = row.querySelector('.sc-search-config-modified-marker') as HTMLElement
-    expect(rowMarker.getAttribute('aria-label')).toBe('Modified')
+    expect(rowMarker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
   })
 
   it('should not mark a predefined row whose name collides with a saved config when the saved config is modified', async () => {
@@ -2041,8 +2050,15 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(predefinedWideRow.querySelector('.sc-search-config-modified-marker')).toBeNull()
 
     // The saved `Wide` row is the one marked — exactly one marker in the opened panel.
-    expect(savedWideRow.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
-    expect(rows.filter((row) => row.querySelector('.sc-search-config-modified-marker')).length).toBe(1)
+    expect(savedWideRow.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    expect(rows.filter((row) => row.querySelector('.sc-search-config-modified-marker'))).toHaveLength(1)
+
+    // The collapsed label is unmarked too: PrimeNG resolves the selected option with `findIndex`
+    // over the visible options, so the first matching leaf (the predefined `Wide`) wins and the saved
+    // `Wide` is never rendered as the selection — its marker never appears in the collapsed label.
+    expect(
+      hostFixture.nativeElement.querySelector('p-select span[role="combobox"] .sc-search-config-modified-marker')
+    ).toBeNull()
   })
 
   it('should mark only the selected saved config row modified when the displayed columns match neither the selected nor the header config', async () => {
@@ -2104,7 +2120,7 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     const wideNameSpan = nameSpans.find((span) => (span.nativeElement as HTMLElement).textContent?.trim() === wide.name)
     expect(wideRow).toBeTruthy()
     expect(wideNameSpan).toBeTruthy()
-    expect(wideRow.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    expect(wideRow.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
     // The name span keeps the config's own name as its tooltip; the `*` marker carries the
     // translated "Modified" tooltip. Only Wide is marked, so there is exactly one marker.
     expect(wideNameSpan!.injector.get(Tooltip).getOption('tooltipLabel')).toBe(wide.name)

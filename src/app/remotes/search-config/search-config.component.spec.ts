@@ -61,6 +61,15 @@ const createSpyObj = (methodNames: Array<string>): { [key: string]: any } => {
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+// The collapsed label text a screen reader does not see: the element's text with the
+// `p-hidden-accessible` children (the marker's translated "Modified" node) removed, so the
+// visible label can be asserted without the hidden marker text.
+const visibleTextOf = (element: Element) => {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.p-hidden-accessible').forEach((hidden) => hidden.remove())
+  return clone.textContent?.trim() ?? ''
+}
+
 type SearchConfigFixture = {
   id: string
   name: string
@@ -1583,15 +1592,15 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // The collapsed label renders the config's name plus the `*` marker (the `#selectedItem` template),
     // not the bare name.
     const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
-    // The marker span holds the `*` with no inner whitespace, and Angular strips the newline
-    // between the name and the marker, so the concatenated label is the name immediately
-    // followed by the `*` (any outer whitespace is trimmed off).
-    expect(combobox.textContent.trim()).toBe(`${config.name}*`)
-    expect(combobox.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
-    // The marker carries an accessible name ("Modified") so assistive technology announces it, not
-    // just a `*`.
+    // The marker's visible child is the `*`, and Angular strips the newline between the name and the
+    // marker, so the visible label is the name immediately followed by the `*` (any outer whitespace
+    // is trimmed off, and the marker's hidden accessible text is ignored).
+    expect(visibleTextOf(combobox)).toBe(`${config.name}*`)
+    expect(combobox.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    // The marker carries an accessible name ("Modified") for assistive technology, not just a `*`:
+    // the `*` is `aria-hidden` and the accessible name is the `p-hidden-accessible` text node.
     const collapsedMarker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
-    expect(collapsedMarker.getAttribute('aria-label')).toBe('Modified')
+    expect(collapsedMarker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
 
     // The opened row of the selected config carries the marker as a sibling of the name span…
     // (scoped to the panel — the collapsed label reuses `.sc-search-config-row` too.)
@@ -1600,7 +1609,7 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     await hostFixture.whenStable()
     const row = hostFixture.nativeElement.querySelector('.sc-search-config-panel .sc-search-config-row') as HTMLElement
     expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(config.name)
-    expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
 
     // …the name span keeps the config's own name as its tooltip (with `showOnEllipsis`), while the
     // `*` marker carries the translated "Modified" tooltip (no `showOnEllipsis`) — so the modified
@@ -1654,9 +1663,9 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // The name truncates (flex `min-width: 0`) but the marker survives as its own flex child.
     const marker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
     expect(marker).toBeTruthy()
-    expect(marker.textContent.trim()).toBe('*')
-    expect(combobox.textContent.trim().endsWith('*')).toBe(true)
-    expect(marker.getAttribute('aria-label')).toBe('Modified')
+    expect(marker.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+    expect(visibleTextOf(combobox).endsWith('*')).toBe(true)
+    expect(marker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
   })
 
   it('should render the Modified tooltip when the modified marker is hovered', async () => {
