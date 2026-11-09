@@ -12,7 +12,8 @@
       "LABEL": "Suchkonfiguration",
       "NO_CONFIGS_LABEL": "Keine Suchkonfigurationen",
       "FILTER_PLACEHOLDER": "Nach Name filtern",
-      "NO_MATCH": "Keine passenden Suchkonfigurationen"
+      "NO_MATCH": "Keine passenden Suchkonfigurationen",
+      "MODIFIED": "Geändert"
     },
     "SAVE_AS": {
       "LABEL": "Speichern unter",

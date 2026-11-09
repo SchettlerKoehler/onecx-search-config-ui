@@ -32,6 +32,12 @@
               <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
                 item.label
               }}</span>
+              @if (!item.isPredefined && item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
+                  <span aria-hidden="true">*</span>
+                  <span class="p-hidden-accessible">{{ 'SEARCH_CONFIG.SELECT.MODIFIED' | translate }}</span>
+                </span>
+              }
               @if (canDelete(item.config)) {
                 <p-button
                   class="sc-search-config-delete"
@@ -44,6 +50,19 @@
                 ></p-button>
               }
             </div>
+          </ng-template>
+          <ng-template #selectedItem let-item>
+            <span class="sc-search-config-row">
+              <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
+                item.label
+              }}</span>
+              @if (!item.isPredefined && vm.selectedConfigModified) {
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
+                  <span aria-hidden="true">*</span>
+                  <span class="p-hidden-accessible">{{ 'SEARCH_CONFIG.SELECT.MODIFIED' | translate }}</span>
+                </span>
+              }
+            </span>
           </ng-template>
         </p-select>
         <label class="sc-search-config-label" id="sc_column_group_label" for="sc_column_group_select">

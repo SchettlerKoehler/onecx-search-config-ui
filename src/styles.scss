@@ -21,7 +21,7 @@
   /* Corner radius of the control, matched to the PrimeNG select token. */
   --onecx-search-config-radius: var(--p-select-border-radius);
   /* Control border color — reserved for a later ticket (no selector reads it yet, so applying the
-   * select border color via this variable would be dead CSS, like the modified-marker token). */
+   * select border color via this variable would be dead CSS). */
   --onecx-search-config-border-color: var(--p-select-border-color);
   /* Maximum height of the opened option list (overlay) before it scrolls. Matches the prototype. */
   --onecx-search-config-panel-max-height: 16rem;
@@ -29,7 +29,7 @@
   --onecx-search-config-delete-color: var(--p-button-danger-background);
   /* Light-red hover background behind the trash icon (PrimeNG text-danger hover tint). */
   --onecx-search-config-delete-hover-background: var(--p-button-text-danger-hover-background);
-  /* Color of the "modified" marker on a config row (used by a later ticket). */
+  /* Color of the "modified" marker next to a selected config's name (option-list row and collapsed label). */
   --onecx-search-config-modified-marker-color: var(--p-button-text-warn-color);
   /* Color of a config option-group header in the list (used by the column remote's grouped headers). */
   --onecx-search-config-group-header-color: var(--p-select-option-group-color);
@@ -69,24 +69,37 @@ ocx-column-group-selection-component {
     height: var(--onecx-search-config-height);
   }
 
+  /* "Modified" marker next to a config's name: same text as the name (it inherits the select's
+   * font), tinted by the app-owned modified-marker token. It sits in the option-list row (a flex
+   * row, so it must not shrink) and in the collapsed select label (a flex row now, so the flex
+   * shorthand applies there too). Kept at the host level so it reaches both. */
+  .sc-search-config-modified-marker {
+    color: var(--onecx-search-config-modified-marker-color);
+    flex: 0 0 auto;
+  }
+
+  /* Config name row: a flex row so the name truncates (ellipsis + tooltip) while the marker and the
+   * delete affordance keep their width. It is reused by both the option-list row and the collapsed
+   * select label (the `#selectedItem` template), so it is defined at the host level, not under the
+   * panel. */
+  .sc-search-config-row {
+    display: flex;
+    align-items: center;
+    /* Spacing between the config name and its delete affordance. PrimeNG select-list gap token. */
+    gap: var(--p-select-list-gap);
+    width: 100%;
+  }
+
+  .sc-search-config-row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* Config-select option list: single-line rows (ellipsis + tooltip). */
   .sc-search-config-panel {
-    .sc-search-config-row {
-      display: flex;
-      align-items: center;
-      /* Spacing between the config name and its delete affordance. PrimeNG select-list gap token. */
-      gap: var(--p-select-list-gap);
-      width: 100%;
-    }
-
-    .sc-search-config-row-name {
-      flex: 1 1 auto;
-      min-width: 0;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     /* Trash affordance: PrimeNG text-danger button (red icon, light-red hover), borderless. The
      * :root variables drive the button through these scoped PrimeNG danger-token overrides. */
     .sc-search-config-delete {

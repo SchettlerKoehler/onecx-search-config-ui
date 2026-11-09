@@ -32,6 +32,12 @@
               <span class="sc-search-config-row-name" [pTooltip]="config.name" [showOnEllipsis]="true">{{
                 config.name
               }}</span>
+              @if (config.id === vm.currentConfig?.id && vm.currentConfigModified) {
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
+                  <span aria-hidden="true">*</span>
+                  <span class="p-hidden-accessible">{{ 'SEARCH_CONFIG.SELECT.MODIFIED' | translate }}</span>
+                </span>
+              }
               @if (canDelete(config)) {
                 <p-button
                   class="sc-search-config-delete"
@@ -44,6 +50,19 @@
                 ></p-button>
               }
             </div>
+          </ng-template>
+          <ng-template #selectedItem let-config>
+            <span class="sc-search-config-row">
+              <span class="sc-search-config-row-name" [pTooltip]="config.name" [showOnEllipsis]="true">{{
+                config.name
+              }}</span>
+              @if (vm.currentConfigModified) {
+                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate">
+                  <span aria-hidden="true">*</span>
+                  <span class="p-hidden-accessible">{{ 'SEARCH_CONFIG.SELECT.MODIFIED' | translate }}</span>
+                </span>
+              }
+            </span>
           </ng-template>
         </p-select>
         <label class="sc-search-config-label" id="sc_search_config_label" for="sc_search_config_select">

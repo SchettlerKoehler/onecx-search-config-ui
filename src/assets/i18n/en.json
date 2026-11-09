@@ -12,7 +12,8 @@
       "LABEL": "Search Config",
       "NO_CONFIGS_LABEL": "No search configs",
       "FILTER_PLACEHOLDER": "Filter by name",
-      "NO_MATCH": "No matching configs"
+      "NO_MATCH": "No matching configs",
+      "MODIFIED": "Modified"
     },
     "SAVE_AS": {
       "LABEL": "Save As",

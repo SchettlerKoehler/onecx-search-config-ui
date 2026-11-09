@@ -105,6 +105,15 @@ const readonlyConfig = {
   isAdvanced: false
 }
 
+// The collapsed label text a screen reader does not see: the element's text with the
+// `p-hidden-accessible` children (the marker's translated "Modified" node) removed, so the
+// visible label can be asserted without the hidden marker text.
+const visibleTextOf = (element: Element) => {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.p-hidden-accessible').forEach((hidden) => hidden.remove())
+  return clone.textContent?.trim() ?? ''
+}
+
 describe('OneCXColumnGroupSelectionComponent', () => {
   let component: OneCXColumnGroupSelectionComponent
   let fixture: ComponentFixture<OneCXColumnGroupSelectionComponent>
@@ -1908,6 +1917,302 @@ describe('OneCXColumnGroupSelectionHarness (remote host element)', () => {
     expect(tooltip.getOption('appendTo')).toBe('body')
     // The tooltip is bound to (its target is) the row's name span, not the whole row.
     expect(tooltip.el.nativeElement).toBe(nameSpan)
+  })
+
+  it('should show the modified marker and a Modified tooltip on the selected saved config row when its displayed columns differ', async () => {
+    // `onlyColumnsConfig` stores only columns (`values: {}`), so the columns aspect is isolated: the
+    // page's field values stay equal to the stored (empty) values and only the displayed columns
+    // diverge. That divergence is what marks the config modified, while the selection is retained. The
+    // header is inactive (default) so the column selection change never swaps the header's current
+    // config.
+    await patchConfigs([onlyColumnsConfig])
+    // The select points at the saved config (`selectedGroupKey`) and the header's current config is the
+    // same one; the marker is driven by the selection, so the displayed columns must diverge from the
+    // stored columns to mark the selected config modified.
+    // The column-group remote is active so the displayed-columns aspect is judged (and the marker
+    // appears).
+    childStore.patchState({
+      selectedGroupKey: onlyColumnsConfig.name,
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
+    expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(onlyColumnsConfig.name)
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    // The name span keeps the config's own name as its tooltip; the `*` marker carries the
+    // translated "Modified" tooltip.
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe(onlyColumnsConfig.name)
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-modified-marker'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe('Modified')
+
+    // The selection was retained, not cleared.
+    expect(childStore.state().currentSearchConfig).toBe(onlyColumnsConfig)
+  })
+
+  it('should show the name with a trailing marker in the collapsed label when the selected saved config is modified', async () => {
+    // The column select is the riskier collapsed-label path: it is grouped (`[group]="true"`) and
+    // value-bound (`optionValue="value"`), so the `#selectedItem` template receives a
+    // `ColumnGroupSelectOption` (the selected leaf), not a saved config.
+    await patchConfigs([onlyColumnsConfig])
+    childStore.patchState({
+      selectedGroupKey: onlyColumnsConfig.name,
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(visibleTextOf(combobox)).toBe(`${onlyColumnsConfig.name}*`)
+    const marker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(marker.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+    expect(marker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
+
+    // The opened panel row carries the marker too (the `#item` template), with the accessible name.
+    // (Scoped to the panel — the collapsed label reuses `.sc-search-config-row` too.)
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    const row = hostFixture.nativeElement.querySelector('.sc-search-config-panel .sc-search-config-row') as HTMLElement
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    const rowMarker = row.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(rowMarker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
+  })
+
+  it('should not mark a predefined row whose name collides with a saved config when the saved config is modified', async () => {
+    // A host predefined group named `Wide` collides with a saved config also named `Wide` (the name
+    // alone cannot tell the two apart). The store resolves the selection by name to the saved config,
+    // so `selectedConfigModified` is true (the saved `Wide`'s stored columns differ from the page
+    // columns). The `isPredefined` row guard keeps the predefined `Wide` row unmarked — only the saved
+    // `Wide` row shows the `*`.
+    //
+    // Both leaves render the name `Wide` (the predefined leaf's label is `translateService.instant('Wide')`,
+    // which is the key itself for a missing key), so the rows are distinguished by document order: the
+    // Predefined group precedes the Saved group, so the first `Wide` row is the predefined one and the
+    // second is the saved one.
+    const wide = {
+      id: 'wide',
+      name: 'Wide',
+      columns: ['col-w', 'col-x'],
+      values: {},
+      isReadonly: false,
+      isAdvanced: false
+    } as SearchConfigInfo
+    await patchConfigs([wide], ['Wide'])
+
+    childStore.patchState({
+      selectedGroupKey: 'Wide',
+      currentSearchConfig: wide,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    const vm = await firstValueFrom(childStore.columnSelectionVm$)
+    // The selection resolves to the saved `Wide` (by name), which is modified by the page columns.
+    expect(vm.selectedConfigModified).toBe(true)
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    // Scope to the panel: the collapsed label reuses `.sc-search-config-row` too and would otherwise
+    // be counted as a third "Wide" row.
+    const rows = Array.from(
+      hostFixture.nativeElement.querySelectorAll('.sc-search-config-panel .sc-search-config-row')
+    ) as HTMLElement[]
+    const wideRows = rows.filter(
+      (row) => row.querySelector('.sc-search-config-row-name')?.textContent?.trim() === 'Wide'
+    )
+    expect(wideRows).toHaveLength(2)
+    const [predefinedWideRow, savedWideRow] = wideRows
+
+    // The predefined `Wide` row is unmarked even though `selectedConfigModified` is true.
+    expect(predefinedWideRow.querySelector('.sc-search-config-modified-marker')).toBeNull()
+
+    // The saved `Wide` row is the one marked — exactly one marker in the opened panel.
+    expect(savedWideRow.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    expect(rows.filter((row) => row.querySelector('.sc-search-config-modified-marker'))).toHaveLength(1)
+
+    // The collapsed label is unmarked too: PrimeNG resolves the selected option with `findIndex`
+    // over the visible options, so the first matching leaf (the predefined `Wide`) wins and the saved
+    // `Wide` is never rendered as the selection — its marker never appears in the collapsed label.
+    expect(
+      hostFixture.nativeElement.querySelector('p-select span[role="combobox"] .sc-search-config-modified-marker')
+    ).toBeNull()
+  })
+
+  it('should mark only the selected saved config row modified when the displayed columns match neither the selected nor the header config', async () => {
+    // The select points at `wide` while the header retains `sales` as its current config, and the
+    // displayed columns match neither the selected config's stored columns nor the header's. The row
+    // marker is driven by the selection — not by which configs are modified — so only the selected
+    // row (the config the select points at) is marked; the header's retained config row shows no `*`.
+    const sales = {
+      id: 'sales',
+      name: 'Sales',
+      columns: ['col-s'],
+      values: { a: '1' },
+      isReadonly: false,
+      isAdvanced: false
+    } as SearchConfigInfo
+    const wide = {
+      id: 'wide',
+      name: 'Wide',
+      columns: ['col-w', 'col-x'],
+      values: {},
+      isReadonly: false,
+      isAdvanced: false
+    } as SearchConfigInfo
+
+    await patchConfigs([sales, wide])
+    // The column-group remote is active so the displayed-columns aspect is judged.
+    childStore.patchState({
+      selectedGroupKey: wide.name,
+      currentSearchConfig: sales,
+      displayedColumnsIds: ['col-9'],
+      fieldValues: { a: '1' },
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    const vm = await firstValueFrom(childStore.columnSelectionVm$)
+    // The column select marks its selection (Wide) modified. The header marks its retained current
+    // config (Sales) modified — both are modified, and they are two different configs.
+    expect(vm.selectedConfigModified).toBe(true)
+
+    // The selection was applied and the header's current config was retained, not swapped.
+    expect(childStore.state().selectedGroupKey).toBe(wide.name)
+    expect(childStore.state().currentSearchConfig).toBe(sales)
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+
+    // The column-group select marks the row it points at (Wide) with the `*` and the "Modified" tooltip.
+    // Scoped to the panel — the collapsed label reuses `.sc-search-config-row`/`-row-name` too.
+    const nameSpans = hostFixture.debugElement.queryAll(By.css('.sc-search-config-panel .sc-search-config-row-name'))
+    const rows = Array.from(
+      hostFixture.nativeElement.querySelectorAll('.sc-search-config-panel .sc-search-config-row')
+    ) as HTMLElement[]
+    const wideRow = rows.find(
+      (row) => row.querySelector('.sc-search-config-row-name')?.textContent?.trim() === wide.name
+    )!
+    const wideNameSpan = nameSpans.find((span) => (span.nativeElement as HTMLElement).textContent?.trim() === wide.name)
+    expect(wideRow).toBeTruthy()
+    expect(wideNameSpan).toBeTruthy()
+    expect(wideRow.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    // The name span keeps the config's own name as its tooltip; the `*` marker carries the
+    // translated "Modified" tooltip. Only Wide is marked, so there is exactly one marker.
+    expect(wideNameSpan!.injector.get(Tooltip).getOption('tooltipLabel')).toBe(wide.name)
+    const wideMarker = hostFixture.debugElement.queryAll(
+      By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-modified-marker')
+    )
+    expect(wideMarker).toHaveLength(1)
+    expect(wideMarker[0].injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
+
+    // The retained header config (Sales) is NOT marked in the column-group select — it is a different
+    // config from the one selected, so its row shows its name and no `*`.
+    const salesNameSpan = nameSpans.find(
+      (span) => (span.nativeElement as HTMLElement).textContent?.trim() === sales.name
+    )
+    expect(salesNameSpan).toBeTruthy()
+    const salesRow = rows.find(
+      (row) => row.querySelector('.sc-search-config-row-name')?.textContent?.trim() === sales.name
+    )!
+    expect(salesRow.querySelector('.sc-search-config-modified-marker')).toBeNull()
+    expect(salesNameSpan!.injector.get(Tooltip).getOption('tooltipLabel')).toBe(sales.name)
+  })
+
+  it('should clear the modified marker and restore the name tooltip when the displayed columns are restored', async () => {
+    // Isolate the columns aspect with `onlyColumnsConfig` (`values: {}`), so restoring the stored
+    // displayed columns is what clears the flag — not some residual values mismatch. The select points
+    // at the saved config (`selectedGroupKey`), which is the config the marker refers to.
+    await patchConfigs([onlyColumnsConfig])
+    // The column-group remote is active so the displayed-columns divergence is judged (and the marker
+    // appears).
+    childStore.patchState({
+      selectedGroupKey: onlyColumnsConfig.name,
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    expect(
+      hostFixture.nativeElement.querySelector('.sc-search-config-row .sc-search-config-modified-marker')
+    ).toBeTruthy()
+
+    // Restoring the stored displayed columns clears the flag: the marker is gone and the name tooltip
+    // is the config name again.
+    childStore.patchState({ displayedColumnsIds: onlyColumnsConfig.columns })
+    await settle()
+    await hostFixture.whenStable()
+
+    expect(
+      hostFixture.nativeElement.querySelector('.sc-search-config-row .sc-search-config-modified-marker')
+    ).toBeNull()
+    expect(
+      hostFixture.debugElement
+        .query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+        .injector.get(Tooltip)
+        .getOption('tooltipLabel')
+    ).toBe(onlyColumnsConfig.name)
+  })
+
+  it('should render the Modified tooltip when the column select marker is hovered', async () => {
+    // The column remote is the other config select (AC3 "both config selects"); the header remote is
+    // inactive, so the marker is driven by the column selection only.
+    await patchConfigs([onlyColumnsConfig])
+    childStore.patchState({
+      selectedGroupKey: onlyColumnsConfig.name,
+      currentSearchConfig: onlyColumnsConfig,
+      displayedColumnsIds: ['col-9'],
+      viewMode: basicViewMode,
+      columnGroupComponentActive: true
+    })
+    await settle()
+
+    // The collapsed (`#selectedItem`) marker is always visible — no need to open the overlay — so use
+    // it to prove the tooltip mounts on hover (the name tooltip only shows on ellipsis, which never
+    // happens in jsdom).
+    const marker = hostFixture.nativeElement.querySelector(
+      'p-select span[role="combobox"] .sc-search-config-modified-marker'
+    ) as HTMLElement
+    expect(marker).toBeTruthy()
+    expect(document.body.querySelector('.p-tooltip')).toBeNull()
+
+    marker.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    hostFixture.detectChanges()
+
+    // Hovering the marker (no `showOnEllipsis`) mounts the tooltip in `document.body` with the
+    // translated "Modified" label.
+    const tooltipText = document.body.querySelector('.p-tooltip .p-tooltip-text')
+    expect(tooltipText).toBeTruthy()
+    expect(tooltipText!.textContent?.trim()).toBe('Modified')
   })
 
   it('should delete the focused saved-config option when Delete is pressed on the open select combobox', async () => {

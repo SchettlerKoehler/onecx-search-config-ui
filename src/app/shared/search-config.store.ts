@@ -6,9 +6,7 @@ import { Topic } from '@onecx/accelerator'
 
 import { SearchConfigInfo } from 'src/app/shared/generated'
 import {
-  advancedViewMode,
   advancedViewModeType,
-  basicViewMode,
   basicViewModeType,
   columngGroupSelectionStoreName as columnGroupSelectionStoreName,
   searchConfigStoreName
@@ -19,7 +17,9 @@ import {
   hasColumns,
   hasOnlyValues,
   hasValues,
-  parseFieldValues
+  isSearchConfigModified,
+  parseFieldValues,
+  SearchConfigPageData
 } from './search-config.utils'
 
 export const SEARCH_CONFIG_TOPIC = new InjectionToken<SearchConfigTopic>('searchConfigTopic')
@@ -81,6 +81,8 @@ export interface SearchConfigState extends SearchConfigComponentState, ColumnGro
 export interface SearchConfigViewModel {
   searchConfigs: SearchConfigInfo[]
   currentConfig: SearchConfigInfo | undefined
+  /** True when the current config is retained but a stored aspect no longer matches the page. */
+  currentConfigModified: boolean
   isColumnGroupComponentActive: boolean
   layout: LayoutType | undefined
 }
@@ -104,6 +106,14 @@ export interface ColumnSelectionViewModel {
 
   searchConfigsWithColumns: SearchConfigInfo[]
   selectedGroupKey: string | undefined
+  /**
+   * True when the saved config the select points at (`selectedGroupKey`) is retained but a stored
+   * aspect no longer matches the page — the config the `*` marker and the "Modified" tooltip in the
+   * column-group select refer to. This is the select's selection, not the header's current config:
+   * when the two differ (the "Sales" criteria + a "Wide" column group example) the header marks the
+   * retained current config while the column-group select marks the selected one.
+   */
+  selectedConfigModified: boolean
   /** The grouped options for the config select, with each saved config attached to its leaf. */
   options: Array<{ label: string; value: string; items: ColumnGroupSelectOption[] }>
 }
@@ -254,21 +264,12 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    const searchConfig = this.isCurrentConfigOutdated(state, {
-      fieldValues: parsedValues
-    })
-      ? undefined
-      : state.currentSearchConfig
-
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, searchConfig)
-
+    // A page state change never re-points the column-group selection at the retained config: the
+    // selection is driven by an explicit selection change, so `selectedGroupKey` is left untouched
+    // (re-syncing it would snap the select back to the config's own column group). The current config
+    // is retained even when its stored aspects no longer match the page — the mismatch surfaces as a
+    // derived `modified` flag (see `isSearchConfigModified`), not a deselection.
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(searchConfig !== state.currentSearchConfig && {
-        currentSearchConfig: searchConfig
-      }),
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       fieldValues: parsedValues,
       displayedSearchData: {
         fieldValues: parsedValues,
@@ -285,21 +286,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    const searchConfig = this.isCurrentConfigOutdated(state, {
-      displayedColumIds: displayedColumnsIds
-    })
-      ? undefined
-      : state.currentSearchConfig
-
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, searchConfig)
-
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(searchConfig !== state.currentSearchConfig && {
-        currentSearchConfig: searchConfig
-      }),
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       displayedColumnsIds: displayedColumnsIds,
       displayedSearchData: {
         fieldValues: state.displayedSearchData?.fieldValues,
@@ -316,21 +303,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       return { ...state }
     }
 
-    const searchConfig = this.isCurrentConfigOutdated(state, {
-      viewMode: viewMode
-    })
-      ? undefined
-      : state.currentSearchConfig
-
-    const selectedGroupKey = this.updateSelectedGroupKeyByConfig(state, searchConfig)
-
     const stateToUpdate: Partial<SearchConfigState> = {
-      ...(searchConfig !== state.currentSearchConfig && {
-        currentSearchConfig: searchConfig
-      }),
-      ...(selectedGroupKey !== state.selectedGroupKey && {
-        selectedGroupKey: selectedGroupKey
-      }),
       viewMode: viewMode,
       displayedSearchData: {
         fieldValues: state.displayedSearchData?.fieldValues,
@@ -387,6 +360,7 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     (state, currentConfig): SearchConfigViewModel => ({
       searchConfigs: state.searchConfigs.filter((config) => hasValues(config)),
       currentConfig: currentConfig,
+      currentConfigModified: isSearchConfigModified(currentConfig, this.pageDataFor(state)),
       isColumnGroupComponentActive: state.columnGroupComponentActive,
       layout: state.layout
     })
@@ -401,11 +375,24 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
   // reflected without any store round-trip.
   readonly columnSelectionVm$ = this.select(this.state$, (state): ColumnSelectionViewModel => {
     const searchConfigsWithColumns = state.searchConfigs.filter((config) => hasColumns(config))
+    const pageData = this.pageDataFor(state)
+    // The config the select points at (`selectedGroupKey`), not the header's current config: when the
+    // two differ the column-group select marks the selection it shows, the header marks the retained
+    // current config. The lookup is by name, so a predefined (or custom) key whose name collides with
+    // a saved config's name resolves to the saved config — a pre-existing ambiguity, because the name
+    // alone cannot tell the two apart here. That leaves the marker unresolved rather than wrong: both
+    // the option row and the collapsed label guard it with `isPredefined`, so the predefined leaf is
+    // never marked. In the collapsed label PrimeNG resolves the selected option with `findIndex` over
+    // the visible options, so the first matching leaf (the predefined one) wins, and a saved config
+    // whose name equals a predefined key is never marked there. Predefined/custom keys that match no
+    // saved config resolve to no config and are therefore never modified.
+    const selectedConfig = searchConfigsWithColumns.find((config) => config.name === state.selectedGroupKey)
     return {
       searchConfigsWithColumns: searchConfigsWithColumns,
       nonSearchConfigGroupKeys: state.nonSearchConfigGroupKeys,
       selectedGroupKey: state.selectedGroupKey,
       customGroupKey: state.customGroupKey,
+      selectedConfigModified: isSearchConfigModified(selectedConfig, pageData),
       options: [
         {
           label: 'COLUMN_GROUP_SELECTION.GROUPS.PREDEFINED',
@@ -513,6 +500,17 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
   // *********** Utilities *********** //
 
+  // Each page aspect is only judged while its owning remote reports it: the criteria while the
+  // header remote is active, the columns while the column-group remote is active — so a
+  // single-remote deployment is not reported modified by aspects it does not track.
+  private pageDataFor(state: SearchConfigState): SearchConfigPageData {
+    return {
+      fieldValues: state.searchConfigComponentActive ? state.fieldValues : undefined,
+      viewMode: state.searchConfigComponentActive ? state.viewMode : undefined,
+      displayedColumnsIds: state.columnGroupComponentActive ? state.displayedColumnsIds : undefined
+    }
+  }
+
   sendUpdateMessage(stateToUpdate: Partial<SearchConfigState>, state: SearchConfigState) {
     let wholeState = false
     if (this.storeName === searchConfigStoreName && !state.columnGroupComponentActive) {
@@ -540,44 +538,6 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
       .catch((err) => console.error(err))
   }
 
-  private isCurrentConfigOutdated(
-    state: SearchConfigState,
-    change: {
-      fieldValues?: FieldValues
-      viewMode?: basicViewModeType | advancedViewModeType
-      displayedColumIds?: Array<string>
-      layout?: 'table' | 'grid' | 'list'
-    }
-  ) {
-    if (state.currentSearchConfig === undefined) return true
-
-    if (
-      hasColumns(state.currentSearchConfig) &&
-      change.displayedColumIds &&
-      !areColumnsEqual(state.currentSearchConfig.columns, change.displayedColumIds) &&
-      // treat values and columns config as solumns only when column group component is not active
-      state.columnGroupComponentActive
-    )
-      return true
-
-    if (
-      hasValues(state.currentSearchConfig) &&
-      change.fieldValues &&
-      !areValuesEqual(state.currentSearchConfig.values, change.fieldValues)
-    ) {
-      return true
-    }
-
-    if (
-      hasValues(state.currentSearchConfig) &&
-      change.viewMode &&
-      (state.currentSearchConfig.isAdvanced ? advancedViewMode : basicViewMode) !== change.viewMode
-    )
-      return true
-
-    return false
-  }
-
   /**
    * update selectedGroupKey using new config
    */
@@ -602,31 +562,27 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
 
   /**
    * update currentSearchConfig using new selectedGroupKey
+   *
+   * The header's current config is retained whenever the new key is a host predefined/custom column
+   * group (those never change the header criteria config — they only affect the column-group
+   * selection) or selects a saved config that stores no values (columns-only picks keep the header
+   * criteria config, surfacing as a derived `modified` flag). Adopting a saved config that stores
+   * values replaces the current config.
    */
   private updateConfigBySelectedGroupKey(
     state: SearchConfigState,
     selectedGroupKey: string
   ): SearchConfigInfo | undefined {
-    if (!state.searchConfigComponentActive) return state.currentSearchConfig
-
-    const searchConfigForSelectedKey = state.searchConfigs.some((c) => c.name === state.selectedGroupKey)
-
     if (
-      searchConfigForSelectedKey &&
-      (state.nonSearchConfigGroupKeys.includes(selectedGroupKey) || selectedGroupKey === state.customGroupKey)
+      !state.searchConfigComponentActive ||
+      state.nonSearchConfigGroupKeys.includes(selectedGroupKey) ||
+      selectedGroupKey === state.customGroupKey
     ) {
-      return undefined
+      return state.currentSearchConfig
     }
 
-    if (
-      !state.nonSearchConfigGroupKeys
-        .concat(state.customGroupKey ? [state.customGroupKey] : [])
-        .includes(selectedGroupKey)
-    ) {
-      return state.searchConfigs.find((c) => c.name === selectedGroupKey)
-    }
-
-    return state.currentSearchConfig
+    const picked = state.searchConfigs.find((c) => c.name === selectedGroupKey)
+    return picked && hasValues(picked) ? picked : state.currentSearchConfig
   }
 
   private isNotUndefined<T>(val: T | undefined): val is T {

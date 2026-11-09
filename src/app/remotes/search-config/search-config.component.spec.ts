@@ -61,6 +61,15 @@ const createSpyObj = (methodNames: Array<string>): { [key: string]: any } => {
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+// The collapsed label text a screen reader does not see: the element's text with the
+// `p-hidden-accessible` children (the marker's translated "Modified" node) removed, so the
+// visible label can be asserted without the hidden marker text.
+const visibleTextOf = (element: Element) => {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.p-hidden-accessible').forEach((hidden) => hidden.remove())
+  return clone.textContent?.trim() ?? ''
+}
+
 type SearchConfigFixture = {
   id: string
   name: string
@@ -939,24 +948,43 @@ describe('OneCXSearchConfigComponent', () => {
   })
 
   describe('on currentConfig change', () => {
-    it('should emit undefined when no config is selected', fakeAsync(() => {
+    it('should retain the selected config and not re-emit when the field values diverge', fakeAsync(() => {
       const localFixture = TestBed.createComponent(OneCXSearchConfigComponent)
       const localComponent = localFixture.componentInstance
       localFixture.detectChanges()
       const localStore = (localComponent as any).searchConfigStore
 
+      // Seed the displayed data so the `searchConfigSelected` emission path (driven by `currentConfig$`
+      // combined with `currentDisplayedData$`) is primed for the initial selection.
       localStore.patchState({
         searchConfigs: [config],
         currentSearchConfig: config,
-        fieldValues: { k: 'v' }
+        fieldValues: config.values,
+        displayedSearchData: { fieldValues: config.values, displayedColumnsIds: [], viewMode: basicViewMode }
       })
 
       const emitterSpy = jest.spyOn(localComponent.searchConfigSelected, 'emit')
-
-      localComponent.currentFieldValues = { k: 'v_2' }
       tick(500)
 
-      expect(emitterSpy).toHaveBeenCalledWith(undefined)
+      // The initial selection emits the config's own stored data exactly once.
+      expect(emitterSpy).toHaveBeenCalledTimes(1)
+      expect(emitterSpy).toHaveBeenCalledWith({
+        name: config.name,
+        fieldValues: config.values,
+        displayedColumnsIds: [],
+        viewMode: basicViewMode
+      })
+      expect(localStore.state().currentSearchConfig).toBe(config)
+
+      // A criteria divergence produces no new emission: `currentConfig$` only fires on a selection
+      // change, so the retained config's mismatch surfaces as the derived `modified` flag rather than
+      // a re-emission — the host keeps the config's stored data.
+      emitterSpy.mockClear()
+      localComponent.currentFieldValues = { k1: 'v_2' }
+      tick(500)
+
+      expect(emitterSpy).toHaveBeenCalledTimes(0)
+      expect(localStore.state().currentSearchConfig).toBe(config)
     }))
 
     it('should emit all config data when selected config has values and columns', fakeAsync(() => {
@@ -1535,6 +1563,182 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     expect(tooltip).toBeTruthy()
     expect(tooltip.getOption('showOnEllipsis')).toBe(true)
     expect(tooltip.getOption('tooltipLabel')).toBe(config.name)
+  })
+
+  it('should show the modified marker and a Modified tooltip on the selected config and the collapsed label when the selected config is modified', async () => {
+    // `config` stores the criteria `{ k1: 'v1' }` and the columns `['col-1']` and is basic
+    // (`isAdvanced: false`). Select it through the store (the proven path), then diverge the field
+    // values (a stored aspect) — that marks it modified while the selection is retained, so the
+    // select keeps pointing at `config`.
+    await patchConfigs([config])
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // Diverge the page's criteria from the stored criteria without touching the selection. The header
+    // remote is active (the store under test is the search-config store), so the criteria aspect is
+    // judged.
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The collapsed label renders the config's name plus the `*` marker (the `#selectedItem` template),
+    // not the bare name.
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    // The marker's visible child is the `*`, and Angular strips the newline between the name and the
+    // marker, so the visible label is the name immediately followed by the `*` (any outer whitespace
+    // is trimmed off, and the marker's hidden accessible text is ignored).
+    expect(visibleTextOf(combobox)).toBe(`${config.name}*`)
+    expect(combobox.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+    // The marker carries an accessible name ("Modified") for assistive technology, not just a `*`:
+    // the `*` is `aria-hidden` and the accessible name is the `p-hidden-accessible` text node.
+    const collapsedMarker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(collapsedMarker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
+
+    // The opened row of the selected config carries the marker as a sibling of the name span…
+    // (scoped to the panel — the collapsed label reuses `.sc-search-config-row` too.)
+    const h = await harness()
+    await (await h.getConfigSelect())?.open()
+    await hostFixture.whenStable()
+    const row = hostFixture.nativeElement.querySelector('.sc-search-config-panel .sc-search-config-row') as HTMLElement
+    expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(config.name)
+    expect(row.querySelector('.sc-search-config-modified-marker [aria-hidden="true"]')?.textContent).toBe('*')
+
+    // …the name span keeps the config's own name as its tooltip (with `showOnEllipsis`), while the
+    // `*` marker carries the translated "Modified" tooltip (no `showOnEllipsis`) — so the modified
+    // tooltip is guaranteed to show, not gated on the name overflowing.
+    const nameDebug = hostFixture.debugElement.query(
+      By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-row-name')
+    )!
+    expect(nameDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe(config.name)
+    expect(nameDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBe(true)
+    const markerDebug = hostFixture.debugElement.query(
+      By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-modified-marker')
+    )!
+    expect(markerDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
+    expect(markerDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBeFalsy()
+
+    // The page's stored criteria diverged, but the selection was retained, not cleared.
+    expect(childStore.state().currentSearchConfig).toBe(config)
+  })
+
+  it('should keep the modified marker in the collapsed label when the selected config name is long', async () => {
+    // A long name (longer than the control) truncates the collapsed label with an ellipsis. The label
+    // is a flex row, so the name span truncates while the `*` marker keeps its own width and stays
+    // present — it is never clipped away. (In jsdom there is no layout, so presence is the assertion;
+    // a fixed inline span would instead let the name and the marker truncate as one text run.)
+    const longNameConfig: SearchConfigFixture = {
+      id: 'long',
+      name: 'a very long saved search configuration name that exceeds the width of the control and truncates',
+      columns: ['col-1'],
+      values: { k1: 'v1' },
+      isReadonly: false,
+      isAdvanced: false
+    }
+    await patchConfigs([longNameConfig])
+    childStore.setCurrentConfig(longNameConfig)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // Diverge the criteria so the config is modified (the marker renders).
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    // The name truncates (flex `min-width: 0`) but the marker survives as its own flex child.
+    const marker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(marker).toBeTruthy()
+    expect(marker.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+    expect(visibleTextOf(combobox).endsWith('*')).toBe(true)
+    expect(marker.querySelector('.p-hidden-accessible')?.textContent?.trim()).toBe('Modified')
+  })
+
+  it('should render the Modified tooltip when the modified marker is hovered', async () => {
+    // `config` stores the criteria `{ k1: 'v1' }`; select it and diverge the field values to make it
+    // modified (the selection is retained, so the `*` marker renders).
+    await patchConfigs([config])
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+    // The header remote is active so the criteria divergence is judged and the marker renders.
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // The collapsed (`#selectedItem`) marker is always visible — no need to open the overlay — so use
+    // it to prove the tooltip actually mounts on hover (the name tooltip alone only shows on
+    // ellipsis, which never happens in jsdom).
+    const marker = hostFixture.nativeElement.querySelector(
+      'p-select span[role="combobox"] .sc-search-config-modified-marker'
+    ) as HTMLElement
+    expect(marker).toBeTruthy()
+    // The tooltip container only exists once shown.
+    expect(document.body.querySelector('.p-tooltip')).toBeNull()
+
+    marker.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    hostFixture.detectChanges()
+
+    // Hovering the marker (no `showOnEllipsis`) mounts the tooltip in `document.body` (the default
+    // `appendTo`) with the translated "Modified" label.
+    const tooltipText = document.body.querySelector('.p-tooltip .p-tooltip-text')
+    expect(tooltipText).toBeTruthy()
+    expect(tooltipText!.textContent?.trim()).toBe('Modified')
+  })
+
+  it('should clear the modified marker and restore the name tooltip when the values are restored', async () => {
+    // Select `config` through the store, then diverge the field values to make it modified.
+    await patchConfigs([config])
+    childStore.setCurrentConfig(config)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+    // The header remote is active so the criteria divergence is judged (and the marker appears).
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+    expect(
+      hostFixture.nativeElement.querySelector('p-select span[role="combobox"] .sc-search-config-modified-marker')
+    ).toBeTruthy()
+
+    // Restoring the stored field values (and leaving columns/view mode as stored) clears the flag.
+    childStore.patchState({ fieldValues: { k1: 'v1' } })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    expect(
+      hostFixture.nativeElement.querySelector('p-select span[role="combobox"] .sc-search-config-modified-marker')
+    ).toBeNull()
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    expect(combobox.textContent.trim()).toBe(config.name)
   })
 
   it('should clear the select and emit the cleared selection when the selected config is deleted', async () => {
