@@ -4,6 +4,7 @@ import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
 import { By } from '@angular/platform-browser'
 import { FormControl } from '@angular/forms'
 import { TranslateService } from '@ngx-translate/core'
+import { Observable, of } from 'rxjs'
 
 import { AutoComplete } from 'primeng/autocomplete'
 
@@ -40,7 +41,9 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
   const beta = configFixture('beta', 'Beta')
   const readonlyGamma = configFixture('gamma', 'Gamma', true)
 
-  const configs = [alpha, beta, readonlyGamma]
+  // The dialog reads the saved configs live from the store (a selector), so every `existingConfigs`
+  // fixture is wrapped in a single-emission observable of the config snapshot under test.
+  const configs = of([alpha, beta, readonlyGamma])
 
   let translateService: TranslateService
 
@@ -60,7 +63,7 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
   // would on a keystroke / suggestion pick).
   function render(
     opts: {
-      existingConfigs?: SearchConfigInfo[]
+      existingConfigs?: Observable<SearchConfigInfo[]>
       appendTo?: 'body' | 'self' | HTMLElement | null
       panelStyleClass?: string
       saveInputValues?: boolean
@@ -74,7 +77,9 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
   } {
     const fixture = TestBed.createComponent(CreateOrEditSearchConfigDialogComponent)
     const component = fixture.componentInstance
-    component.existingConfigs = opts.existingConfigs ?? []
+    // The dialog reads the saved configs live from the store (a selector), so the fixture mirrors the
+    // remotes and passes a single-emission observable of the config snapshot under test.
+    component.existingConfigs = opts.existingConfigs ?? of([])
     component.appendTo = opts.appendTo
     component.panelStyleClass = opts.panelStyleClass
     // The box setters run before the lock (mirroring the dialog's input application order) so a
@@ -367,7 +372,9 @@ describe('CreateOrEditSearchConfigDialogComponent', () => {
     it('should start with no suggestions when no configs are provided', () => {
       const fixture = TestBed.createComponent(CreateOrEditSearchConfigDialogComponent)
       const component = fixture.componentInstance
-      component.existingConfigs = undefined as any
+      // The remotes always pass a selector (which emits the empty store list on boot); a defensive
+      // `undefined` emission is tolerated and still yields no suggestions.
+      component.existingConfigs = of(undefined as any)
       fixture.detectChanges()
       expect(component.nameSuggestions).toStrictEqual([])
     })

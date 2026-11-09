@@ -51,8 +51,14 @@ describe('search-config-create', () => {
   const success = jest.fn()
   const error = jest.fn()
 
+  // The remotes pass a live store selector (an observable), so the helper reads the config list at
+  // confirm time via `withLatestFrom`; the assertion references this same instance so the `openDialog`
+  // `inputs.existingConfigs` comparison is by identity (two separately-built `of(...)` observables are
+  // not structurally equal).
+  const existingConfigs$ = of([existingConfig])
+
   const baseDialogInputs = {
-    existingConfigs: [existingConfig],
+    existingConfigs: existingConfigs$,
     appendTo: 'self' as const,
     panelStyleClass: 'panel-class',
     saveInputValues: true,
@@ -217,7 +223,7 @@ describe('search-config-create', () => {
         {
           type: expect.anything(),
           inputs: {
-            existingConfigs: [existingConfig],
+            existingConfigs: existingConfigs$,
             appendTo: 'self',
             panelStyleClass: 'panel-class',
             saveInputValues: true,
@@ -324,7 +330,7 @@ describe('search-config-create', () => {
       await lastValueFrom(
         saveSearchConfig(portalDialogService, searchConfigService, messageService, appStateService, store, pageName, {
           ...baseDialogInputs,
-          existingConfigs: []
+          existingConfigs: of([])
         })
       )
 
@@ -514,7 +520,7 @@ describe('search-config-create', () => {
       const response = await lastValueFrom(
         saveSearchConfig(portalDialogService, searchConfigService, messageService, appStateService, store, pageName, {
           ...baseDialogInputs,
-          existingConfigs: [readonlyConfig]
+          existingConfigs: of([readonlyConfig])
         })
       )
 

@@ -81,22 +81,25 @@ export type SaveSearchConfigResult = {
 /**
  * Opens the reusable Save As dialog and, when it confirms (`button === 'primary'` with a result),
  * creates the config for a new name or overwrites the matched existing (non-read-only) config. The
- * matched config is resolved here against `dialogInputs.existingConfigs` (trimmed, case-insensitive),
- * so the helper and the dialog's inline warning agree on the overwrite target without the dialog having
- * to carry the id through its result. A failed create or update fires the shared error toast and
- * resolves to `undefined`; the success toast (`saved` / `overwritten`, `success` severity) is fired
- * here per path.
+ * matched config is resolved here against `dialogInputs.existingConfigs` (trimmed, case-insensitive)
+ * at confirm time, so the helper and the dialog's inline warning agree on the overwrite target without
+ * the dialog having to carry the id through its result. A failed create or update fires the shared
+ * error toast and resolves to `undefined`; the success toast (`saved` / `overwritten`, `success`
+ * severity) is fired here per path.
  *
  * Overwrite semantics: the saved aspects fully replace the stored content. The single exception is when
  * "Save columns" is locked (`frozeColumnSaveOption`): the stored columns are kept (the box is forced
  * off, so they can never be re-checked) and only the search criteria are replaced.
  *
- * `pageName` is the resolved page-name observable (the store's `pageName$` for the header, or the
- * column-group remote's live `pageName ?? applicationPath` selector for standalone use) and is applied
- * to the request. Combining the confirmed dialog result with the current MFE, page data and page name
+ * `dialogInputs.existingConfigs` and `pageName` are the resolved live observables — the store's
+ * `searchConfigs` selector and the store's `pageName$` for the header, or the column-group remote's live
+ * `pageName ?? applicationPath` selector for standalone use — and are applied to the request.
+ * Combining the confirmed dialog result with the current MFE, page data, page name and the live configs
  * via `withLatestFrom` means a confirmed dialog is never dropped: the confirmed dialog result is what
- * drives the single emission, and the live selector always has a value, so a page name is present in the
- * standalone case too.
+ * drives the single emission, and the live selectors always have a value, so a page name and the config
+ * list are present in the standalone case too. Reading the configs at confirm time (not a snapshot taken
+ * when the dialog opened) keeps the helper's create-vs-update decision in agreement with the dialog's
+ * suggestion and overwrite warning, which read the same live store value while the dialog is open.
  */
 export function saveSearchConfig(
   portalDialogService: PortalDialogService,
@@ -106,7 +109,7 @@ export function saveSearchConfig(
   store: SearchConfigStore,
   pageName: Observable<string>,
   dialogInputs: {
-    existingConfigs: SearchConfigInfo[]
+    existingConfigs: Observable<SearchConfigInfo[]>
     appendTo?: 'body' | 'self' | HTMLElement | null
     panelStyleClass?: string
     saveInputValues: boolean
@@ -135,14 +138,23 @@ export function saveSearchConfig(
       { width: SEARCH_CONFIG_DIALOG_WIDTH }
     )
     .pipe(
-      withLatestFrom(appStateService.currentMfe$.asObservable(), store.currentPageData$, pageName),
-      switchMap(([dialogResult, currentMfe, pageData, page]) => {
+      withLatestFrom(
+        appStateService.currentMfe$.asObservable(),
+        store.currentPageData$,
+        pageName,
+        dialogInputs.existingConfigs
+      ),
+      switchMap(([dialogResult, currentMfe, pageData, page, existingConfigs]) => {
         const result = dialogResult?.result
         if (!result || dialogResult.button !== 'primary') {
           return of(undefined as SaveSearchConfigResult | undefined)
         }
+        // The config list is read live at confirm time (a store selector, not a snapshot taken when the
+        // dialog opened) so the decision agrees with the dialog's suggestion and overwrite warning,
+        // which track the same live store value while the dialog is open.
+        const configs = existingConfigs ?? []
         const typedName = (result.searchConfigName ?? '').trim().toLowerCase()
-        const existingConfig = dialogInputs.existingConfigs.find(
+        const existingConfig = configs.find(
           (config) => !config.isReadonly && config.name.trim().toLowerCase() === typedName
         )
         const isOverwrite = existingConfig !== undefined

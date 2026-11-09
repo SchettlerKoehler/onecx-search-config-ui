@@ -13,7 +13,7 @@ import {
 } from '@angular/core'
 import { provideHttpClient } from '@angular/common/http'
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
-import { ReplaySubject, of, throwError } from 'rxjs'
+import { Observable, ReplaySubject, of, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 import { Select } from 'primeng/select'
 import { Tooltip } from 'primeng/tooltip'
@@ -66,6 +66,34 @@ const createSpyObj = (methodNames: Array<string>): { [key: string]: any } => {
 }
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+// The Save As helper receives the saved configs as a live store selector (not a snapshot), so the
+// dialog tracks the store while it is open. The `existingConfigs` input is asserted with
+// `expect.any(Observable)` (the exact selector reference is not stable), and this helper verifies the
+// observable actually emits the store's current `searchConfigs`.
+const expectExistingConfigsSelector = (
+  dialogServiceSpy: jest.SpyInstance,
+  expected: Array<{
+    id: string
+    name: string
+    columns: string[]
+    values: Record<string, string>
+    isReadonly: boolean
+    isAdvanced: boolean
+  }>
+) => {
+  const inputs = dialogServiceSpy.mock.calls[0][1].inputs as { existingConfigs: Observable<any> }
+  let emitted: unknown
+  let done = false
+  const sub = inputs.existingConfigs.subscribe((value) => {
+    if (!done) {
+      done = true
+      emitted = value
+    }
+  })
+  sub.unsubscribe()
+  expect(emitted).toEqual(expected)
+}
 
 // The collapsed label text a screen reader does not see: the element's text with the
 // `p-hidden-accessible` children (the marker's translated "Modified" node) removed, so the
@@ -413,7 +441,8 @@ describe('OneCXSearchConfigComponent', () => {
         {
           type: CreateOrEditSearchConfigDialogComponent,
           inputs: {
-            existingConfigs: [config],
+            // A live store selector (not a snapshot), so the dialog tracks the store while open.
+            existingConfigs: expect.any(Observable),
             appendTo: 'self',
             panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
             saveInputValues: true,
@@ -426,6 +455,7 @@ describe('OneCXSearchConfigComponent', () => {
         cancelButton,
         { width: SEARCH_CONFIG_DIALOG_WIDTH }
       )
+      expectExistingConfigsSelector(dialogServiceSpy, [config])
     }))
 
     it('should open the Save As dialog with the table-inactive explanation when the layout is not a table', fakeAsync(() => {
@@ -458,7 +488,8 @@ describe('OneCXSearchConfigComponent', () => {
         {
           type: CreateOrEditSearchConfigDialogComponent,
           inputs: {
-            existingConfigs: [],
+            // A live store selector (not a snapshot), so the dialog tracks the store while open.
+            existingConfigs: expect.any(Observable),
             appendTo: 'self',
             panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
             saveInputValues: true,
@@ -471,6 +502,7 @@ describe('OneCXSearchConfigComponent', () => {
         cancelButton,
         { width: SEARCH_CONFIG_DIALOG_WIDTH }
       )
+      expectExistingConfigsSelector(dialogServiceSpy, [])
     }))
 
     it('should open the Save As dialog with the columns option editable when the layout is a table', fakeAsync(() => {
@@ -503,7 +535,8 @@ describe('OneCXSearchConfigComponent', () => {
         {
           type: CreateOrEditSearchConfigDialogComponent,
           inputs: {
-            existingConfigs: [config, readonlyConfig],
+            // A live store selector (not a snapshot), so the dialog tracks the store while open.
+            existingConfigs: expect.any(Observable),
             appendTo: 'self',
             panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
             saveInputValues: true,
@@ -516,6 +549,7 @@ describe('OneCXSearchConfigComponent', () => {
         cancelButton,
         { width: SEARCH_CONFIG_DIALOG_WIDTH }
       )
+      expectExistingConfigsSelector(dialogServiceSpy, [config, readonlyConfig])
     }))
 
     it('should not upsert or set the config when the dialog was closed', fakeAsync(() => {

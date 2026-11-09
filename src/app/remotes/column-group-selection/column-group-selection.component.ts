@@ -347,7 +347,7 @@ export class OneCXColumnGroupSelectionComponent
       this.searchConfigStore,
       this.pageName$,
       {
-        existingConfigs: this.searchConfigStore.state().searchConfigs,
+        existingConfigs: this.searchConfigStore.select((state) => state.searchConfigs),
         appendTo: 'self',
         panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
         saveInputValues: false,

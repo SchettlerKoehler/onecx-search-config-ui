@@ -70,7 +70,9 @@ describe('Save As dialog style scoping', () => {
         {
           type: CreateOrEditSearchConfigDialogComponent,
           inputs: {
-            existingConfigs: [] as never[],
+            // The remotes pass a live store selector; the real dialog subscribes to it, so an empty
+            // single-emission observable is the equivalent host input here.
+            existingConfigs: of([] as never[]),
             saveInputValues: true,
             saveColumns: false,
             frozeColumnSaveOption: false

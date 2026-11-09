@@ -13,7 +13,7 @@ import {
 } from '@angular/core'
 import { HttpEvent, provideHttpClient } from '@angular/common/http'
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed'
-import { BehaviorSubject, ReplaySubject, Subject, firstValueFrom, of, take, throwError } from 'rxjs'
+import { BehaviorSubject, Observable, ReplaySubject, Subject, firstValueFrom, of, take, throwError } from 'rxjs'
 import { DialogService } from 'primeng/dynamicdialog'
 import { Select } from 'primeng/select'
 import { Tooltip } from 'primeng/tooltip'
@@ -118,6 +118,24 @@ const visibleTextOf = (element: Element) => {
   const clone = element.cloneNode(true) as HTMLElement
   clone.querySelectorAll('.p-hidden-accessible').forEach((hidden) => hidden.remove())
   return clone.textContent?.trim() ?? ''
+}
+
+// The Save As helper receives the saved configs as a live store selector (not a snapshot), so the
+// dialog tracks the store while it is open. The `existingConfigs` input is asserted with
+// `expect.any(Observable)` (the exact selector reference is not stable), and this helper verifies the
+// observable actually emits the store's current `searchConfigs`.
+const expectExistingConfigsSelector = (dialogServiceSpy: jest.SpyInstance, expected: unknown) => {
+  const inputs = dialogServiceSpy.mock.calls[0][1].inputs as { existingConfigs: Observable<unknown> }
+  let emitted: unknown
+  let done = false
+  const sub = inputs.existingConfigs.subscribe((value) => {
+    if (!done) {
+      done = true
+      emitted = value
+    }
+  })
+  sub.unsubscribe()
+  expect(emitted).toEqual(expected)
 }
 
 describe('OneCXColumnGroupSelectionComponent', () => {
@@ -935,7 +953,8 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         {
           type: CreateOrEditSearchConfigDialogComponent,
           inputs: {
-            existingConfigs: store.state().searchConfigs,
+            // A live store selector (not a snapshot), so the dialog tracks the store while open.
+            existingConfigs: expect.any(Observable),
             appendTo: 'self',
             panelStyleClass: SEARCH_CONFIG_AUTOCOMPLETE_PANEL_STYLE_CLASS,
             saveInputValues: false,
@@ -947,6 +966,7 @@ describe('OneCXColumnGroupSelectionComponent', () => {
         cancelButton,
         { width: SEARCH_CONFIG_DIALOG_WIDTH }
       )
+      expectExistingConfigsSelector(dialogServiceSpy, [config])
     }))
 
     it('should save the displayed columns and no input values when a new config is created', fakeAsync(() => {

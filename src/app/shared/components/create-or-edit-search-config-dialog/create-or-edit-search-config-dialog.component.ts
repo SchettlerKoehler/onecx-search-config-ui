@@ -2,15 +2,17 @@ import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  DestroyRef,
   EventEmitter,
   Input,
   OnInit,
   Output,
   inject
 } from '@angular/core'
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms'
 import { TranslateModule, TranslateService } from '@ngx-translate/core'
-import { Observable, startWith } from 'rxjs'
+import { Observable, of, startWith } from 'rxjs'
 
 import { AutoCompleteCompleteEvent, AutoCompleteModule } from 'primeng/autocomplete'
 import { CheckboxModule } from 'primeng/checkbox'
@@ -50,12 +52,23 @@ export class CreateOrEditSearchConfigDialogComponent
     OnInit
 {
   private readonly changeDetectorRef = inject(ChangeDetectorRef)
+  private readonly destroyRef = inject(DestroyRef)
   private readonly translateService = inject(TranslateService)
 
-  /** The page's saved configs; the non-read-only ones back the name field's suggestions. */
-  @Input() existingConfigs: SearchConfigInfo[] = []
+  /**
+   * The page's saved configs, read live from the store; the non-read-only ones back the name field's
+   * suggestions and the overwrite match. It is an observable (a live store selector in both remotes)
+   * rather than a snapshot so the dialog's suggestions and overwrite warning track the store while it
+   * is open, and the `saveSearchConfig` helper — which resolves its create-vs-update decision against
+   * the same live value at confirm time — agrees with the warning.
+   */
+  @Input() existingConfigs: Observable<SearchConfigInfo[]> = of([])
 
-  /** PrimeNG overlay `appendTo` for the suggestions panel; the default `'self'` keeps it inside the dialog. */
+  /**
+   * PrimeNG overlay `appendTo` for the suggestions panel. Unset by default (no `'self'` default): when
+   * the host leaves it `undefined`, PrimeNG falls back to appending the panel to `body`. Both remotes
+   * pass `'self'` explicitly to keep the panel inside the portaled dialog.
+   */
   @Input() appendTo?: 'body' | 'self' | HTMLElement | null
 
   /** Stable hook for the suggestions panel, applied by the host through `data-style-id` scoping. */
@@ -133,9 +146,14 @@ export class CreateOrEditSearchConfigDialogComponent
     return this.matchedConfigId !== undefined
   }
 
+  // The latest emission of the `existingConfigs` observable (the live store value), kept by the
+  // subscription in `ngOnInit` so the match and the canonical config stay current while the store
+  // changes behind an open dialog.
+  private _existingConfigs: SearchConfigInfo[] = []
+
   /** The existing config the field resolves to (canonical name for the warning and the toast). */
   get matchedConfig(): SearchConfigInfo | undefined {
-    return this.matchedConfigId ? this.existingConfigs.find((config) => config.id === this.matchedConfigId) : undefined
+    return this.matchedConfigId ? this._existingConfigs.find((config) => config.id === this.matchedConfigId) : undefined
   }
 
   /**
@@ -165,8 +183,20 @@ export class CreateOrEditSearchConfigDialogComponent
   }
 
   ngOnInit(): void {
-    this._configNames = (this.existingConfigs ?? []).filter((config) => !config.isReadonly).map((config) => config.name)
-    this._nameSuggestions = this._configNames
+    // Read the saved configs live (the store value the remotes pass as a selector), not a snapshot
+    // taken at dialog-open time: the non-read-only ones back the name field's suggestions and the
+    // overwrite match, so both must track the store while the dialog is open — and stay in agreement
+    // with the `saveSearchConfig` helper, which resolves its create-vs-update decision against the
+    // same live value at confirm time. Re-deriving the match on every emission (and after the next
+    // keystroke, see the form subscription below) keeps the overwrite warning correct as the store
+    // changes.
+    this.existingConfigs.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((configs: SearchConfigInfo[]) => {
+      this._existingConfigs = configs ?? []
+      this._configNames = this._existingConfigs.filter((config) => !config.isReadonly).map((config) => config.name)
+      this._nameSuggestions = this._configNames
+      this._matchedConfigId = this.matchName(this.searchConfigFormGroup.value.searchConfigName)
+      this.changeDetectorRef.markForCheck()
+    })
 
     // The name field is a `typeahead` autocomplete, so every keystroke and each selected suggestion
     // lands in the form control. Re-deriving the match here — rather than relying on PrimeNG's debounced
@@ -218,6 +248,6 @@ export class CreateOrEditSearchConfigDialogComponent
     if (!query) {
       return undefined
     }
-    return this.existingConfigs.find((config) => !config.isReadonly && config.name.trim().toLowerCase() === query)?.id
+    return this._existingConfigs.find((config) => !config.isReadonly && config.name.trim().toLowerCase() === query)?.id
   }
 }
