@@ -1588,29 +1588,75 @@ describe('OneCXSearchConfigHarness (remote host element)', () => {
     // followed by the `*` (any outer whitespace is trimmed off).
     expect(combobox.textContent.trim()).toBe(`${config.name}*`)
     expect(combobox.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
+    // The marker carries an accessible name ("Modified") so assistive technology announces it, not
+    // just a `*`.
+    const collapsedMarker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(collapsedMarker.getAttribute('aria-label')).toBe('Modified')
 
     // The opened row of the selected config carries the marker as a sibling of the name span…
+    // (scoped to the panel — the collapsed label reuses `.sc-search-config-row` too.)
     const h = await harness()
     await (await h.getConfigSelect())?.open()
     await hostFixture.whenStable()
-    const row = hostFixture.nativeElement.querySelector('.sc-search-config-row') as HTMLElement
+    const row = hostFixture.nativeElement.querySelector('.sc-search-config-panel .sc-search-config-row') as HTMLElement
     expect(row.querySelector('.sc-search-config-row-name')?.textContent.trim()).toBe(config.name)
     expect(row.querySelector('.sc-search-config-modified-marker')?.textContent.trim()).toBe('*')
 
     // …the name span keeps the config's own name as its tooltip (with `showOnEllipsis`), while the
     // `*` marker carries the translated "Modified" tooltip (no `showOnEllipsis`) — so the modified
     // tooltip is guaranteed to show, not gated on the name overflowing.
-    const nameDebug = hostFixture.debugElement.query(By.css('.sc-search-config-row .sc-search-config-row-name'))!
+    const nameDebug = hostFixture.debugElement.query(
+      By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-row-name')
+    )!
     expect(nameDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe(config.name)
     expect(nameDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBe(true)
     const markerDebug = hostFixture.debugElement.query(
-      By.css('.sc-search-config-row .sc-search-config-modified-marker')
+      By.css('.sc-search-config-panel .sc-search-config-row .sc-search-config-modified-marker')
     )!
     expect(markerDebug.injector.get(Tooltip).getOption('tooltipLabel')).toBe('Modified')
     expect(markerDebug.injector.get(Tooltip).getOption('showOnEllipsis')).toBeFalsy()
 
     // The page's stored criteria diverged, but the selection was retained, not cleared.
     expect(childStore.state().currentSearchConfig).toBe(config)
+  })
+
+  it('should keep the modified marker in the collapsed label when the selected config name is long', async () => {
+    // A long name (longer than the control) truncates the collapsed label with an ellipsis. The label
+    // is a flex row, so the name span truncates while the `*` marker keeps its own width and stays
+    // present — it is never clipped away. (In jsdom there is no layout, so presence is the assertion;
+    // a fixed inline span would instead let the name and the marker truncate as one text run.)
+    const longNameConfig: SearchConfigFixture = {
+      id: 'long',
+      name: 'a very long saved search configuration name that exceeds the width of the control and truncates',
+      columns: ['col-1'],
+      values: { k1: 'v1' },
+      isReadonly: false,
+      isAdvanced: false
+    }
+    await patchConfigs([longNameConfig])
+    childStore.setCurrentConfig(longNameConfig)
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    // Diverge the criteria so the config is modified (the marker renders).
+    childStore.patchState({
+      fieldValues: { k1: 'v2' },
+      displayedColumnsIds: ['col-1'],
+      viewMode: basicViewMode,
+      searchConfigComponentActive: true
+    })
+    await delay(80)
+    hostFixture.detectChanges()
+    await hostFixture.whenStable()
+
+    const combobox = hostFixture.nativeElement.querySelector('p-select span[role="combobox"]') as HTMLElement
+    // The name truncates (flex `min-width: 0`) but the marker survives as its own flex child.
+    const marker = combobox.querySelector('.sc-search-config-modified-marker') as HTMLElement
+    expect(marker).toBeTruthy()
+    expect(marker.textContent.trim()).toBe('*')
+    expect(combobox.textContent.trim().endsWith('*')).toBe(true)
+    expect(marker.getAttribute('aria-label')).toBe('Modified')
   })
 
   it('should render the Modified tooltip when the modified marker is hovered', async () => {

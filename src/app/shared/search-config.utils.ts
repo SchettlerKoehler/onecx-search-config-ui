@@ -1,15 +1,15 @@
 import { isValidDate } from '@onecx/accelerator'
 
 import { SearchConfigInfo } from './generated'
-import { advancedViewMode, basicViewMode, advancedViewModeType, basicViewModeType } from './constants'
-import { FieldValues, UnparsedFieldValues } from './search-config.store'
+import { advancedViewMode, basicViewMode } from './constants'
+import { FieldValues, SearchData, UnparsedFieldValues } from './search-config.store'
 
-/** The page aspects compared to decide whether a config is modified (field values, view mode, columns). */
-export type SearchConfigPageData = {
-  fieldValues?: FieldValues
-  viewMode?: basicViewModeType | advancedViewModeType
-  displayedColumnsIds?: Array<string>
-}
+/**
+ * The page aspects compared to decide whether a config is modified (field values, view mode,
+ * columns). Every field is optional so a deployment can track a subset of them — aspects the page
+ * does not track are skipped rather than compared.
+ */
+export type SearchConfigPageData = Partial<SearchData>
 
 export function hasValues(config: SearchConfigInfo): boolean {
   return Object.keys(config.values).length > 0

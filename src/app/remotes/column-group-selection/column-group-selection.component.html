@@ -32,8 +32,12 @@
               <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
                 item.label
               }}</span>
-              @if (item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
-                <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+              @if (!item.isPredefined && item.value === vm.selectedGroupKey && vm.selectedConfigModified) {
+                <span
+                  class="sc-search-config-modified-marker"
+                  role="img"
+                  [attr.aria-label]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                  [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
                   >*</span
                 >
               }
@@ -51,12 +55,20 @@
             </div>
           </ng-template>
           <ng-template #selectedItem let-item>
-            <span [pTooltip]="item.label" [showOnEllipsis]="true">{{ item.label }}</span>
-            @if (vm.selectedConfigModified) {
-              <span class="sc-search-config-modified-marker" [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
-                >*</span
-              >
-            }
+            <span class="sc-search-config-row">
+              <span class="sc-search-config-row-name" [pTooltip]="item.label" [showOnEllipsis]="true">{{
+                item.label
+              }}</span>
+              @if (!item.isPredefined && vm.selectedConfigModified) {
+                <span
+                  class="sc-search-config-modified-marker"
+                  role="img"
+                  [attr.aria-label]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                  [pTooltip]="'SEARCH_CONFIG.SELECT.MODIFIED' | translate"
+                  >*</span
+                >
+              }
+            </span>
           </ng-template>
         </p-select>
         <label class="sc-search-config-label" id="sc_column_group_label" for="sc_column_group_select">

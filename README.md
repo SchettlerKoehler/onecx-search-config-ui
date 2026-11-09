@@ -25,7 +25,7 @@ unscoped global selectors. Remotes inherit the host theme and set no theme of th
 | `--onecx-search-config-panel-max-height` | Maximum height of the opened option list before it scrolls. | `16rem` (app-owned layout cap) |
 | `--onecx-search-config-delete-color` | Color of the per-row delete (trash) icon. | `var(--p-button-danger-background)` (PrimeNG danger/red) |
 | `--onecx-search-config-delete-hover-background` | Light-red background behind the trash icon on hover. | `var(--p-button-text-danger-hover-background)` |
-| `--onecx-search-config-modified-marker-color` | Color of the "modified" marker on a config row. | `var(--p-button-text-warn-color)` |
+| `--onecx-search-config-modified-marker-color` | Color of the `*` marker next to a modified config's name (option row and collapsed label). | `var(--p-button-text-warn-color)` |
 | `--onecx-search-config-group-header-color` | Color of a config option-group header in the list. | `var(--p-select-option-group-color)` |
 | `--onecx-search-config-dialog-width` | Width of the reusable delete-confirm dialog (applied via `PortalDialogConfig.width`). | `30rem` (app-owned) |
 

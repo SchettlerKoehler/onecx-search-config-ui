@@ -378,7 +378,12 @@ export class SearchConfigStore extends ComponentStore<SearchConfigState> {
     const pageData = this.pageDataFor(state)
     // The config the select points at (`selectedGroupKey`), not the header's current config: when the
     // two differ the column-group select marks the selection it shows, the header marks the retained
-    // current config. Predefined/custom keys resolve to no config and are therefore never modified.
+    // current config. The lookup is by name, so a predefined (or custom) key whose name collides with
+    // a saved config's name resolves to the saved config — a pre-existing ambiguity, because the name
+    // alone cannot tell the two apart here. When that happens the collapsed label can mark the saved
+    // config as modified even though the selection is the predefined group; the option row avoids the
+    // case with its `isPredefined` guard. Predefined/custom keys that match no saved config resolve to
+    // no config and are therefore never modified.
     const selectedConfig = searchConfigsWithColumns.find((config) => config.name === state.selectedGroupKey)
     return {
       searchConfigsWithColumns: searchConfigsWithColumns,
